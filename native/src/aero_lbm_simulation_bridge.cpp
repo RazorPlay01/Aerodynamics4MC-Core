@@ -1152,7 +1152,8 @@ bool build_brick_step_packet(
         std::fill(packet.begin(), packet.end(), 0.0f);
     }
     const DynamicRegionData* boundary_reference = brick.boundary_reference_region.get();
-    const bool boundary_reference_valid = brick_dynamic_region_valid(runtime, boundary_reference);
+    const bool boundary_reference_valid = brick_dynamic_region_valid(runtime, boundary_reference)
+        && dynamic_has_nonzero_flow(*boundary_reference);
     const bool exposed_x_neg = boundary_reference_valid && brick_face_exposed(runtime, coord, 0, false);
     const bool exposed_x_pos = boundary_reference_valid && brick_face_exposed(runtime, coord, 0, true);
     const bool exposed_y_neg = boundary_reference_valid && brick_face_exposed(runtime, coord, 1, false);
