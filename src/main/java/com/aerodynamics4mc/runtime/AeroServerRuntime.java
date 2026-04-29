@@ -118,11 +118,13 @@ public final class AeroServerRuntime {
     private static final float ATLAS_VELOCITY_QUANT_RANGE = 5.6f;
     private static final float ATLAS_PRESSURE_QUANT_RANGE = 0.03f;
     private static final float ZERO_ATLAS_MAX_SPEED_EPS_MPS = 0.02f;
+    private static final int ZERO_ATLAS_HOLD_TICKS = 6;
     private static final float EXPECTED_COARSE_WIND_MIN_MPS = 0.05f;
     private static final int COARSE_WIND_SYNC_CELL_SIZE_BLOCKS = 32;
     private static final int COARSE_WIND_SYNC_SIZE_X = 9;
     private static final int COARSE_WIND_SYNC_SIZE_Y = 5;
     private static final int COARSE_WIND_SYNC_SIZE_Z = 9;
+    private static final int COARSE_WIND_RESEND_INTERVAL_TICKS = TICKS_PER_SECOND;
     private static final float ANALYSIS_FLOW_VELOCITY_TOLERANCE = 0.02f;
     private static final float ANALYSIS_FLOW_PRESSURE_TOLERANCE = 0.0005f;
     private static final int L2_CAPTURE_DEFAULT_DURATION_SECONDS = 30;
@@ -307,6 +309,8 @@ public final class AeroServerRuntime {
     private final Map<WindowKey, Integer> shellWindowRetainUntilTick = new HashMap<>();
     private final Map<WindowKey, Integer> solveWindowRetainUntilTick = new HashMap<>();
     private final Map<UUID, PlayerMotionAnchorState> playerMotionAnchorStates = new HashMap<>();
+    private final Map<UUID, CoarseWindSyncState> lastCoarseWindSyncStates = new HashMap<>();
+    private final Map<WindowKey, Integer> zeroAtlasHoldUntilTick = new HashMap<>();
     private final Set<WindowKey> mirrorOnlyPrewarmedWindowKeys = new HashSet<>();
     private final Map<WindowKey, Long> mirrorOnlyUploadedBrickStaticSignatures = new HashMap<>();
     private final Map<WindowKey, Long> uploadedBrickDynamicSeedSignatures = new HashMap<>();
@@ -324,6 +328,7 @@ public final class AeroServerRuntime {
     private volatile int tickCounter = 0;
     private long simulationTicks = 0L;
     private long lastObservedPublishedFrameId = 0L;
+    private long lastSyncedFlowFrameId = 0L;
     private volatile int lastPublishedFrameTick = Integer.MIN_VALUE;
     private int secondWindowTotalTicks = 0;
     private int secondWindowSimulationTicks = 0;
@@ -677,9 +682,13 @@ public final class AeroServerRuntime {
     }
 
     private boolean containsBlock(BlockPos windowOrigin, BlockPos pos) {
-        return pos.getX() >= windowOrigin.getX() && pos.getX() < windowOrigin.getX() + GRID_SIZE
-            && pos.getY() >= windowOrigin.getY() && pos.getY() < windowOrigin.getY() + GRID_SIZE
-            && pos.getZ() >= windowOrigin.getZ() && pos.getZ() < windowOrigin.getZ() + GRID_SIZE;
+        return containsBlock(windowOrigin, pos, GRID_SIZE);
+    }
+
+    private boolean containsBlock(BlockPos origin, BlockPos pos, int size) {
+        return pos.getX() >= origin.getX() && pos.getX() < origin.getX() + size
+            && pos.getY() >= origin.getY() && pos.getY() < origin.getY() + size
+            && pos.getZ() >= origin.getZ() && pos.getZ() < origin.getZ() + size;
     }
 
     private boolean chunkOverlapsBrickColumn(ChunkPos chunkPos, int brickX, int brickZ) {
@@ -740,6 +749,10 @@ public final class AeroServerRuntime {
             .requires(CommandManager.requirePermissionLevel(CommandManager.ADMINS_CHECK))
             .then(CommandManager.literal("start")
                 .executes(ctx -> {
+                    resetMainThreadProfiling();
+                    lastSyncedFlowFrameId = 0L;
+                    lastCoarseWindSyncStates.clear();
+                    zeroAtlasHoldUntilTick.clear();
                     streamingEnabled = true;
                     lastSolverError = "";
                     ensureSimulationCoordinatorRunning();
@@ -2316,6 +2329,11 @@ public final class AeroServerRuntime {
         appendJsonArray(builder, "ambient_air_temperature_kelvin", snapshot.ambientAirTemperatureKelvin(), true);
         appendJsonArray(builder, "deep_ground_temperature_kelvin", snapshot.deepGroundTemperatureKelvin(), true);
         appendJsonArray(builder, "surface_temperature_kelvin", snapshot.surfaceTemperatureKelvin(), true);
+        appendJsonArray(builder, "pressure_anomaly_pa", snapshot.pressureAnomalyPa(), true);
+        appendJsonArray(builder, "pressure_gradient_x_pa_per_m", snapshot.pressureGradientXPaPerMeter(), true);
+        appendJsonArray(builder, "pressure_gradient_z_pa_per_m", snapshot.pressureGradientZPaPerMeter(), true);
+        appendJsonArray(builder, "geostrophic_wind_x", snapshot.geostrophicWindX(), true);
+        appendJsonArray(builder, "geostrophic_wind_z", snapshot.geostrophicWindZ(), true);
         appendJsonArray(builder, "wind_x", snapshot.windX(), true);
         appendJsonArray(builder, "wind_z", snapshot.windZ(), true);
         appendJsonArray(builder, "humidity", snapshot.humidity(), true);
@@ -2370,12 +2388,19 @@ public final class AeroServerRuntime {
         appendJsonArray(builder, "forcing_surface_target_kelvin", snapshot.forcingSurfaceTargetKelvin(), true);
         appendJsonArray(builder, "forcing_background_wind_x", snapshot.forcingBackgroundWindX(), true);
         appendJsonArray(builder, "forcing_background_wind_z", snapshot.forcingBackgroundWindZ(), true);
+        appendJsonArray(builder, "forcing_surface_wind_x", snapshot.forcingSurfaceWindX(), true);
+        appendJsonArray(builder, "forcing_surface_wind_z", snapshot.forcingSurfaceWindZ(), true);
+        appendJsonArray(builder, "forcing_geostrophic_wind_x", snapshot.forcingGeostrophicWindX(), true);
+        appendJsonArray(builder, "forcing_geostrophic_wind_z", snapshot.forcingGeostrophicWindZ(), true);
+        appendJsonArray(builder, "forcing_wind_shear_x_per_block", snapshot.forcingWindShearXPerBlock(), true);
+        appendJsonArray(builder, "forcing_wind_shear_z_per_block", snapshot.forcingWindShearZPerBlock(), true);
         appendJsonArray(builder, "forcing_nested_ambient_delta_kelvin", snapshot.forcingNestedAmbientDeltaKelvin(), true);
         appendJsonArray(builder, "forcing_nested_surface_delta_kelvin", snapshot.forcingNestedSurfaceDeltaKelvin(), true);
         appendJsonArray(builder, "forcing_nested_wind_x_delta", snapshot.forcingNestedWindXDelta(), true);
         appendJsonArray(builder, "forcing_nested_wind_z_delta", snapshot.forcingNestedWindZDelta(), true);
         appendJsonArray(builder, "forcing_nested_updraft", snapshot.forcingNestedUpdraft(), true);
         appendJsonArray(builder, "wind_x", snapshot.windX(), true);
+        appendJsonArray(builder, "wind_y", snapshot.windY(), true);
         appendJsonArray(builder, "wind_z", snapshot.windZ(), true);
         appendJsonArray(builder, "humidity", snapshot.humidity(), true);
         appendJsonArray(builder, "instability_proxy", snapshot.instabilityProxy(), true);
@@ -2619,6 +2644,7 @@ public final class AeroServerRuntime {
         boolean shouldSyncFlow = tickCounter % PARTICLE_FLOW_SYNC_INTERVAL_TICKS == 0;
         PublishedFrame frame = publishedFrame.get();
         if (frame == null || frame.regionAtlases().isEmpty()) {
+            lastSyncedFlowFrameId = 0L;
             if (shouldSyncFlow) {
                 phaseStartNanos = System.nanoTime();
                 syncCoarseWindToPlayers(server);
@@ -2635,7 +2661,10 @@ public final class AeroServerRuntime {
         if (shouldSyncFlow) {
             phaseStartNanos = System.nanoTime();
             syncCoarseWindToPlayers(server);
-            syncPublishedFlowToPlayers(server, frame);
+            if (frame.frameId() > lastSyncedFlowFrameId) {
+                syncPublishedFlowToPlayers(server, frame);
+                lastSyncedFlowFrameId = frame.frameId();
+            }
             tickL2Capture(server);
             recordMainThreadPhase(MAIN_THREAD_PHASE_FLOW_SYNC, System.nanoTime() - phaseStartNanos);
         } else {
@@ -2662,6 +2691,17 @@ public final class AeroServerRuntime {
         if (nanos > maxMainThreadPhaseNanos[phaseIndex]) {
             maxMainThreadPhaseNanos[phaseIndex] = nanos;
         }
+    }
+
+    private void resetMainThreadProfiling() {
+        Arrays.fill(lastMainThreadPhaseNanos, 0L);
+        Arrays.fill(maxMainThreadPhaseNanos, 0L);
+        Arrays.fill(lastCallbackTotalNanos, 0L);
+        Arrays.fill(lastCallbackLockWaitNanos, 0L);
+        Arrays.fill(lastCallbackLockHeldNanos, 0L);
+        Arrays.fill(maxCallbackTotalNanos, 0L);
+        Arrays.fill(maxCallbackLockWaitNanos, 0L);
+        Arrays.fill(maxCallbackLockHeldNanos, 0L);
     }
 
     private static float nanosToMillis(long nanos) {
@@ -2763,6 +2803,7 @@ public final class AeroServerRuntime {
         simulationStepBudget.set(0);
         simulationTicks = 0L;
         lastObservedPublishedFrameId = 0L;
+        lastSyncedFlowFrameId = 0L;
         lastPublishedFrameTick = Integer.MIN_VALUE;
         secondWindowTotalTicks = 0;
         secondWindowSimulationTicks = 0;
@@ -2797,6 +2838,8 @@ public final class AeroServerRuntime {
         shellWindowRetainUntilTick.clear();
         solveWindowRetainUntilTick.clear();
         playerMotionAnchorStates.clear();
+        lastCoarseWindSyncStates.clear();
+        zeroAtlasHoldUntilTick.clear();
         mirrorOnlyPrewarmedWindowKeys.clear();
         mirrorOnlyUploadedBrickStaticSignatures.clear();
         uploadedBrickDynamicSeedSignatures.clear();
@@ -3648,6 +3691,11 @@ public final class AeroServerRuntime {
         Arrays.fill(snapshot.openFaceMask(), (byte) 0);
         Arrays.fill(snapshot.faceSkyExposure(), (byte) 0);
         Arrays.fill(snapshot.faceDirectExposure(), (byte) 0);
+        ThermalMaterial[] materials = new ThermalMaterial[SECTION_CELL_COUNT];
+        int[] cachedSkyExposure = new int[SECTION_CELL_COUNT];
+        int[] cachedDirectExposure = new int[SECTION_CELL_COUNT];
+        Arrays.fill(cachedSkyExposure, -1);
+        Arrays.fill(cachedDirectExposure, -1);
         BlockPos.Mutable cursor = new BlockPos.Mutable();
         for (int x = 0; x < CHUNK_SIZE; x++) {
             for (int y = 0; y < CHUNK_SIZE; y++) {
@@ -3659,23 +3707,158 @@ public final class AeroServerRuntime {
                     snapshot.obstacle()[cell] = solid ? 1.0f : 0.0f;
                     snapshot.air()[cell] = state.isAir() ? 1.0f : 0.0f;
                     ThermalMaterial material = thermalMaterial(state);
+                    materials[cell] = material;
                     snapshot.surfaceKind()[cell] = material == null ? SURFACE_KIND_NONE : material.kind();
-                    sectionStaticThermalFields(
+                    snapshot.emitterPowerWatts()[cell] = sampleEmitterThermalPowerWatts(state);
+                }
+            }
+        }
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_SIZE; y++) {
+                for (int z = 0; z < CHUNK_SIZE; z++) {
+                    int cell = localSectionCellIndex(x, y, z);
+                    populateCachedSectionFaceFields(
                         world,
-                        cursor,
-                        state,
+                        origin,
                         x,
                         y,
                         z,
-                        material,
-                        snapshot.emitterPowerWatts(),
+                        materials[cell],
+                        snapshot.emitterPowerWatts()[cell],
+                        snapshot.air(),
+                        snapshot.obstacle(),
                         snapshot.openFaceMask(),
                         snapshot.faceSkyExposure(),
-                        snapshot.faceDirectExposure()
+                        snapshot.faceDirectExposure(),
+                        cachedSkyExposure,
+                        cachedDirectExposure,
+                        cursor
                     );
                 }
             }
         }
+    }
+
+    private void populateCachedSectionFaceFields(
+        ServerWorld world,
+        BlockPos origin,
+        int x,
+        int y,
+        int z,
+        ThermalMaterial material,
+        float emitterPower,
+        float[] localAir,
+        float[] localObstacle,
+        byte[] openFaceMaskField,
+        byte[] faceSkyExposure,
+        byte[] faceDirectExposure,
+        int[] cachedSkyExposure,
+        int[] cachedDirectExposure,
+        BlockPos.Mutable cursor
+    ) {
+        if (material == null && emitterPower <= 0.0f) {
+            return;
+        }
+        int cell = localSectionCellIndex(x, y, z);
+        byte openFaceMask = 0;
+        for (Direction direction : CARDINAL_DIRECTIONS) {
+            int nx = x + direction.getOffsetX();
+            int ny = y + direction.getOffsetY();
+            int nz = z + direction.getOffsetZ();
+            boolean openFace;
+            if (inSectionBounds(nx, ny, nz)) {
+                int neighborCell = localSectionCellIndex(nx, ny, nz);
+                openFace = material != null
+                    ? material.atmosphericExchangeRequiresAirNeighbor()
+                        ? localAir[neighborCell] >= 0.5f
+                        : localObstacle[neighborCell] < 0.5f
+                    : localAir[neighborCell] >= 0.5f;
+            } else {
+                cursor.set(
+                    origin.getX() + nx,
+                    origin.getY() + ny,
+                    origin.getZ() + nz
+                );
+                BlockState neighborState = world.getBlockState(cursor);
+                openFace = material != null
+                    ? material.atmosphericExchangeRequiresAirNeighbor()
+                        ? neighborState.isAir()
+                        : !isSolidObstacle(world, cursor, neighborState)
+                    : neighborState.isAir();
+            }
+            if (!openFace) {
+                continue;
+            }
+            openFaceMask = setFaceBit(openFaceMask, direction);
+            int faceIndex = faceDataIndex(cell, direction);
+            faceSkyExposure[faceIndex] = cachedSectionSkyExposure(
+                world,
+                origin,
+                nx,
+                ny,
+                nz,
+                cachedSkyExposure,
+                cursor
+            );
+            faceDirectExposure[faceIndex] = cachedSectionDirectExposure(
+                world,
+                origin,
+                nx,
+                ny,
+                nz,
+                cachedDirectExposure,
+                cursor
+            );
+        }
+        openFaceMaskField[cell] = openFaceMask;
+    }
+
+    private byte cachedSectionSkyExposure(
+        ServerWorld world,
+        BlockPos origin,
+        int x,
+        int y,
+        int z,
+        int[] cache,
+        BlockPos.Mutable cursor
+    ) {
+        if (inSectionBounds(x, y, z)) {
+            int cell = localSectionCellIndex(x, y, z);
+            int cached = cache[cell];
+            if (cached >= 0) {
+                return (byte) cached;
+            }
+            cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
+            byte value = quantizeUnitFloat(sampleSkyExposure(world, cursor));
+            cache[cell] = Byte.toUnsignedInt(value);
+            return value;
+        }
+        cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
+        return quantizeUnitFloat(sampleSkyExposure(world, cursor));
+    }
+
+    private byte cachedSectionDirectExposure(
+        ServerWorld world,
+        BlockPos origin,
+        int x,
+        int y,
+        int z,
+        int[] cache,
+        BlockPos.Mutable cursor
+    ) {
+        if (inSectionBounds(x, y, z)) {
+            int cell = localSectionCellIndex(x, y, z);
+            int cached = cache[cell];
+            if (cached >= 0) {
+                return (byte) cached;
+            }
+            cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
+            byte value = quantizeUnitFloat(sampleDirectSunExposure(world, cursor));
+            cache[cell] = Byte.toUnsignedInt(value);
+            return value;
+        }
+        cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
+        return quantizeUnitFloat(sampleDirectSunExposure(world, cursor));
     }
 
     private boolean shouldRefreshWindowThermal(RegionRecord region) {
@@ -4447,6 +4630,9 @@ public final class AeroServerRuntime {
                 surfaceTemperatureState
             );
         }
+        if (maxFlowSpeedMetersPerSecond(flowState) < ZERO_ATLAS_MAX_SPEED_EPS_MPS) {
+            return false;
+        }
         return simulationBridge.uploadBrickWorldBoundaryReferenceBrick(
             simulationServiceId,
             simulationWorldKey(worldKey),
@@ -5042,7 +5228,14 @@ public final class AeroServerRuntime {
                 surfaceTemperatureState
             );
         }
-        simulationBridge.uploadBrickWorldDynamicBrick(
+        float seedMaxSpeed = maxFlowSpeedMetersPerSecond(flowState);
+        if (seedMaxSpeed < ZERO_ATLAS_MAX_SPEED_EPS_MPS) {
+            if (signature != Long.MIN_VALUE) {
+                uploadedBrickDynamicSeedSignatures.remove(key);
+            }
+            return;
+        }
+        boolean uploaded = simulationBridge.uploadBrickWorldDynamicBrick(
             simulationServiceId,
             simulationWorldKey(key.worldKey()),
             BRICK_RUNTIME_SIZE,
@@ -5053,10 +5246,9 @@ public final class AeroServerRuntime {
             airTemperatureState,
             surfaceTemperatureState
         );
-        float seedMaxSpeed = maxFlowSpeedMetersPerSecond(flowState);
-        if (signature != Long.MIN_VALUE && seedMaxSpeed >= ZERO_ATLAS_MAX_SPEED_EPS_MPS) {
+        if (uploaded && signature != Long.MIN_VALUE) {
             uploadedBrickDynamicSeedSignatures.put(key, signature);
-        } else if (signature != Long.MIN_VALUE) {
+        } else if (!uploaded && signature != Long.MIN_VALUE) {
             uploadedBrickDynamicSeedSignatures.remove(key);
         }
     }
@@ -7237,6 +7429,26 @@ public final class AeroServerRuntime {
             && expectedCoarseSpeedMetersPerSecond(key) >= EXPECTED_COARSE_WIND_MIN_MPS;
     }
 
+    private boolean shouldHoldPreviousAtlas(
+        WindowKey key,
+        BrickRuntimeAtlasSnapshot atlas,
+        BrickRuntimeAtlasSnapshot previousAtlas
+    ) {
+        if (atlas == null || atlas.maxSpeed() >= ZERO_ATLAS_MAX_SPEED_EPS_MPS) {
+            zeroAtlasHoldUntilTick.remove(key);
+            return false;
+        }
+        if (previousAtlas == null || previousAtlas.maxSpeed() < ZERO_ATLAS_MAX_SPEED_EPS_MPS) {
+            return false;
+        }
+        Integer holdUntilTick = zeroAtlasHoldUntilTick.get(key);
+        if (holdUntilTick == null) {
+            zeroAtlasHoldUntilTick.put(key, tickCounter + ZERO_ATLAS_HOLD_TICKS);
+            return true;
+        }
+        return tickCounter <= holdUntilTick;
+    }
+
     private BrickRuntimeAtlasSnapshot sampleBrickRuntimeCoreAtlas(WindowKey key) {
         BlockPos coreOrigin = key.origin().add(REGION_HALO_CELLS, REGION_HALO_CELLS, REGION_HALO_CELLS);
         BrickRuntimeDynamicState brickState = copyBrickRuntimeDynamicState(
@@ -7277,7 +7489,7 @@ public final class AeroServerRuntime {
                 }
             }
         }
-        return new BrickRuntimeAtlasSnapshot(coreOrigin, packed, maxSpeed);
+        return new BrickRuntimeAtlasSnapshot(coreOrigin, packed, AeroFlowPayload.encodePackedFlow(packed), maxSpeed);
     }
 
     private float publishBrickSolveAtlases(Set<WindowKey> solveWindowKeys) {
@@ -7295,10 +7507,10 @@ public final class AeroServerRuntime {
             if (atlas == null) {
                 continue;
             }
-            if (shouldSuppressZeroBrickAtlas(key, atlas)) {
+            BrickRuntimeAtlasSnapshot previousAtlas = previousFrame == null ? null : previousFrame.regionAtlases().get(key);
+            Float previousMaxSpeed = previousFrame == null ? null : previousFrame.regionMaxSpeeds().get(key);
+            if (shouldHoldPreviousAtlas(key, atlas, previousAtlas) || shouldSuppressZeroBrickAtlas(key, atlas)) {
                 uploadedBrickDynamicSeedSignatures.remove(key);
-                BrickRuntimeAtlasSnapshot previousAtlas = previousFrame == null ? null : previousFrame.regionAtlases().get(key);
-                Float previousMaxSpeed = previousFrame == null ? null : previousFrame.regionMaxSpeeds().get(key);
                 if (previousAtlas == null || previousMaxSpeed == null) {
                     continue;
                 }
@@ -7307,9 +7519,11 @@ public final class AeroServerRuntime {
                 regionMaxSpeeds.put(key, previousMaxSpeed);
                 continue;
             }
+            zeroAtlasHoldUntilTick.remove(key);
             atlases.put(key, atlas);
             regionMaxSpeeds.put(key, atlas.maxSpeed());
         }
+        zeroAtlasHoldUntilTick.keySet().retainAll(solveWindowKeys);
         if (atlases.isEmpty()) {
             return previousFrame == null ? 0.0f : previousFrame.maxSpeed();
         }
@@ -7373,19 +7587,31 @@ public final class AeroServerRuntime {
         }
         for (Map.Entry<WindowKey, BrickRuntimeAtlasSnapshot> entry : frame.regionAtlases().entrySet()) {
             WindowKey key = entry.getKey();
+            if (!key.worldKey().equals(player.getEntityWorld().getRegistryKey())
+                || !containsBlock(entry.getValue().origin(), player.getBlockPos(), BRICK_RUNTIME_SIZE)) {
+                continue;
+            }
             BrickRuntimeAtlasSnapshot atlas = entry.getValue();
             Identifier dimId = key.worldKey().getValue();
             ServerPlayNetworking.send(
                 player,
-                new AeroFlowPayload(dimId, atlas.origin(), PARTICLE_FLOW_SAMPLE_STRIDE, atlas.packed())
+                AeroFlowPayload.fromPackedBytes(
+                    dimId,
+                    atlas.origin(),
+                    PARTICLE_FLOW_SAMPLE_STRIDE,
+                    atlas.packed(),
+                    atlas.packedFlowBytes()
+                )
             );
         }
     }
 
     private void sendCoarseWindSnapshotToPlayer(ServerPlayerEntity player) {
-        AeroCoarseWindPayload payload = buildCoarseWindPayloadForPlayer(player);
+        CoarseWindSyncState state = coarseWindSyncStateForPlayer(player);
+        AeroCoarseWindPayload payload = buildCoarseWindPayloadForPlayer(player, state);
         if (payload != null) {
             ServerPlayNetworking.send(player, payload);
+            lastCoarseWindSyncStates.put(player.getUuid(), state);
         }
     }
 
@@ -7531,34 +7757,75 @@ public final class AeroServerRuntime {
                 continue;
             }
             BrickRuntimeAtlasSnapshot atlas = entry.getValue();
-            AeroFlowPayload payload = new AeroFlowPayload(
+            List<ServerPlayerEntity> recipients = playersInsideFlowAtlas(world, atlas);
+            if (recipients.isEmpty()) {
+                continue;
+            }
+            AeroFlowPayload payload = AeroFlowPayload.fromPackedBytes(
                 world.getRegistryKey().getValue(),
                 atlas.origin(),
                 PARTICLE_FLOW_SAMPLE_STRIDE,
-                atlas.packed()
+                atlas.packed(),
+                atlas.packedFlowBytes()
             );
-            for (ServerPlayerEntity player : world.getPlayers()) {
+            for (ServerPlayerEntity player : recipients) {
                 ServerPlayNetworking.send(player, payload);
             }
         }
     }
 
-    private void syncCoarseWindToPlayers(MinecraftServer server) {
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            sendCoarseWindSnapshotToPlayer(player);
+    private List<ServerPlayerEntity> playersInsideFlowAtlas(ServerWorld world, BrickRuntimeAtlasSnapshot atlas) {
+        List<ServerPlayerEntity> recipients = new ArrayList<>();
+        for (ServerPlayerEntity player : world.getPlayers()) {
+            if (containsBlock(atlas.origin(), player.getBlockPos(), BRICK_RUNTIME_SIZE)) {
+                recipients.add(player);
+            }
         }
+        return recipients;
     }
 
-    private AeroCoarseWindPayload buildCoarseWindPayloadForPlayer(ServerPlayerEntity player) {
-        ServerWorld world = player.getEntityWorld();
-        if (world == null) {
-            return null;
+    private void syncCoarseWindToPlayers(MinecraftServer server) {
+        Set<UUID> observedPlayers = new HashSet<>();
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            observedPlayers.add(player.getUuid());
+            CoarseWindSyncState state = coarseWindSyncStateForPlayer(player);
+            CoarseWindSyncState previous = lastCoarseWindSyncStates.get(player.getUuid());
+            if (previous != null
+                && previous.sameRegion(state)
+                && tickCounter - previous.tick() < COARSE_WIND_RESEND_INTERVAL_TICKS) {
+                continue;
+            }
+            AeroCoarseWindPayload payload = buildCoarseWindPayloadForPlayer(player, state);
+            if (payload != null) {
+                ServerPlayNetworking.send(player, payload);
+                lastCoarseWindSyncStates.put(player.getUuid(), state);
+            }
         }
+        lastCoarseWindSyncStates.keySet().retainAll(observedPlayers);
+    }
+
+    private CoarseWindSyncState coarseWindSyncStateForPlayer(ServerPlayerEntity player) {
+        ServerWorld world = player.getEntityWorld();
         BlockPos playerPos = player.getBlockPos();
         int cellSize = COARSE_WIND_SYNC_CELL_SIZE_BLOCKS;
-        int originX = coarseWindOriginFor(playerPos.getX(), COARSE_WIND_SYNC_SIZE_X, cellSize);
-        int originY = coarseWindOriginFor(playerPos.getY(), COARSE_WIND_SYNC_SIZE_Y, cellSize);
-        int originZ = coarseWindOriginFor(playerPos.getZ(), COARSE_WIND_SYNC_SIZE_Z, cellSize);
+        return new CoarseWindSyncState(
+            world.getRegistryKey(),
+            coarseWindOriginFor(playerPos.getX(), COARSE_WIND_SYNC_SIZE_X, cellSize),
+            coarseWindOriginFor(playerPos.getY(), COARSE_WIND_SYNC_SIZE_Y, cellSize),
+            coarseWindOriginFor(playerPos.getZ(), COARSE_WIND_SYNC_SIZE_Z, cellSize),
+            tickCounter
+        );
+    }
+
+    private AeroCoarseWindPayload buildCoarseWindPayloadForPlayer(ServerPlayerEntity player, CoarseWindSyncState state) {
+        ServerWorld world = player.getEntityWorld();
+        if (world == null || state == null) {
+            return null;
+        }
+        int originX = state.originX();
+        int originY = state.originY();
+        int originZ = state.originZ();
+        int cellSize = COARSE_WIND_SYNC_CELL_SIZE_BLOCKS;
         BlockPos origin = new BlockPos(originX, originY, originZ);
         short[] packed = new short[
             COARSE_WIND_SYNC_SIZE_X
@@ -8029,7 +8296,7 @@ public final class AeroServerRuntime {
     ) {
     }
 
-    private record BrickRuntimeAtlasSnapshot(BlockPos origin, short[] packed, float maxSpeed) {
+    private record BrickRuntimeAtlasSnapshot(BlockPos origin, short[] packed, byte[] packedFlowBytes, float maxSpeed) {
     }
 
     private record TornadoRegionDescriptor(
@@ -8076,6 +8343,22 @@ public final class AeroServerRuntime {
         Map<WindowKey, BrickRuntimeAtlasSnapshot> regionAtlases,
         Map<WindowKey, Float> regionMaxSpeeds
     ) {
+    }
+
+    private record CoarseWindSyncState(
+        RegistryKey<World> worldKey,
+        int originX,
+        int originY,
+        int originZ,
+        int tick
+    ) {
+        boolean sameRegion(CoarseWindSyncState other) {
+            return other != null
+                && worldKey.equals(other.worldKey())
+                && originX == other.originX()
+                && originY == other.originY()
+                && originZ == other.originZ();
+        }
     }
 
     private record NestedFeedbackAxisSpan(int index, int localMin, int localMax) {

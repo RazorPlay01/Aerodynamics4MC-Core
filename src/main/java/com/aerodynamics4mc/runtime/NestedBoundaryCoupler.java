@@ -20,7 +20,7 @@ final class NestedBoundaryCoupler {
         }
         return new BoundarySample(
             sample.windX(),
-            0.0f,
+            sample.windY(),
             sample.windZ(),
             sample.ambientAirTemperatureKelvin(),
             sample.deepGroundTemperatureKelvin()

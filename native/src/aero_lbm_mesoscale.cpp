@@ -140,14 +140,35 @@ constexpr int kOutAmbient = 0;
 constexpr int kOutDeepGround = 1;
 constexpr int kOutSurface = 2;
 constexpr int kOutWindX = 3;
-constexpr int kOutWindZ = 4;
-constexpr int kMesoQ = 9;
-constexpr std::array<int, kMesoQ> kMesoCx = {0, 1, -1, 0, 0, 1, -1, 1, -1};
-constexpr std::array<int, kMesoQ> kMesoCz = {0, 0, 0, 1, -1, 1, -1, -1, 1};
-constexpr std::array<int, kMesoQ> kMesoOpp = {0, 2, 1, 4, 3, 6, 5, 8, 7};
+constexpr int kOutWindY = 4;
+constexpr int kOutWindZ = 5;
+constexpr bool kUseD3Q19Mesoscale = true;
+constexpr int kMesoQ = 19;
+constexpr std::array<int, kMesoQ> kMesoCx = {
+    0,
+    1, -1, 0, 0, 0, 0,
+    1, -1, 1, -1, 1, -1, 1, -1, 0, 0, 0, 0
+};
+constexpr std::array<int, kMesoQ> kMesoCy = {
+    0,
+    0, 0, 1, -1, 0, 0,
+    1, -1, -1, 1, 0, 0, 0, 0, 1, -1, 1, -1
+};
+constexpr std::array<int, kMesoQ> kMesoCz = {
+    0,
+    0, 0, 0, 0, 1, -1,
+    0, 0, 0, 0, 1, -1, -1, 1, 1, -1, -1, 1
+};
+constexpr std::array<int, kMesoQ> kMesoOpp = {
+    0,
+    2, 1, 4, 3, 6, 5,
+    8, 7, 10, 9, 12, 11, 14, 13, 16, 15, 18, 17
+};
 constexpr std::array<float, kMesoQ> kMesoW = {
-    4.0f / 9.0f,
-    1.0f / 9.0f, 1.0f / 9.0f, 1.0f / 9.0f, 1.0f / 9.0f,
+    1.0f / 3.0f,
+    1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f,
+    1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f,
+    1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f,
     1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f
 };
 constexpr float kEdgeBlendThicknessCells = 2.0f;
@@ -156,6 +177,7 @@ constexpr float kMaxLatticeWind = 0.20f;
 struct CellTargets {
     float rho = 1.0f;
     float relax_ux = 0.0f;
+    float relax_uy = 0.0f;
     float relax_uz = 0.0f;
     float thermal_eq = 288.15f;
     float next_surface = 288.15f;
@@ -170,6 +192,7 @@ struct MesoscaleContextState {
     std::vector<float> deep_ground;
     std::vector<float> surface;
     std::vector<float> wind_x;
+    std::vector<float> wind_y;
     std::vector<float> wind_z;
     std::vector<float> f;
     std::vector<float> f_next;
@@ -227,19 +250,24 @@ int dist_index(int cell, int q) {
     return cell * kMesoQ + q;
 }
 
-float hydro_feq_2d(int q, float rho, float ux, float uz) {
-    const float cu = 3.0f * (kMesoCx[q] * ux + kMesoCz[q] * uz);
-    const float uu = ux * ux + uz * uz;
+float hydro_feq_3d(int q, float rho, float ux, float uy, float uz) {
+    const float cu = 3.0f * (kMesoCx[q] * ux + kMesoCy[q] * uy + kMesoCz[q] * uz);
+    const float uu = ux * ux + uy * uy + uz * uz;
     return kMesoW[q] * rho * (1.0f + cu + 0.5f * cu * cu - 1.5f * uu);
 }
 
-float thermal_feq_2d(int q, float temperature, float ux, float uz) {
-    const float cu = 3.0f * (kMesoCx[q] * ux + kMesoCz[q] * uz);
+float thermal_feq_3d(int q, float temperature, float ux, float uy, float uz) {
+    const float cu = 3.0f * (kMesoCx[q] * ux + kMesoCy[q] * uy + kMesoCz[q] * uz);
     return kMesoW[q] * temperature * (1.0f + cu);
 }
 
 float clamp_lattice_speed(float u) {
     return std::clamp(u, -kMaxLatticeWind, kMaxLatticeWind);
+}
+
+float trt_odd_tau(float even_tau) {
+    const float tau_delta = std::max(0.03f, even_tau - 0.5f);
+    return std::clamp(0.5f + 0.25f / tau_delta, 0.55f, 2.5f);
 }
 
 void ensure_mesoscale_storage(MesoscaleContextState& ctx) {
@@ -249,6 +277,7 @@ void ensure_mesoscale_storage(MesoscaleContextState& ctx) {
     ctx.deep_ground.resize(cells);
     ctx.surface.resize(cells);
     ctx.wind_x.resize(cells);
+    ctx.wind_y.resize(cells);
     ctx.wind_z.resize(cells);
     ctx.f.resize(cells * kMesoQ);
     ctx.f_next.resize(cells * kMesoQ);
@@ -268,8 +297,12 @@ void seed_mesoscale_state(
         const float surface_target = forcing[base + kChSurfaceTarget] + forcing[base + kChNestedSurfaceDelta];
         const float bg_wind_x = forcing[base + kChBackgroundWindX] + forcing[base + kChNestedWindXDelta];
         const float bg_wind_z = forcing[base + kChBackgroundWindZ] + forcing[base + kChNestedWindZDelta];
+        const float bg_wind_y = forcing[base + kChNestedUpdraft] + forcing[base + kChTornadoUpdraft];
         const float bg_wind_x_lattice = clamp_lattice_speed(
             bg_wind_x / std::max(1.0e-6f, velocity_scale_m_s_per_lattice)
+        );
+        const float bg_wind_y_lattice = clamp_lattice_speed(
+            bg_wind_y / std::max(1.0e-6f, velocity_scale_m_s_per_lattice)
         );
         const float bg_wind_z_lattice = clamp_lattice_speed(
             bg_wind_z / std::max(1.0e-6f, velocity_scale_m_s_per_lattice)
@@ -279,10 +312,11 @@ void seed_mesoscale_state(
         ctx.deep_ground[i] = forcing[base + kChDeepGroundTarget];
         ctx.surface[i] = surface_target;
         ctx.wind_x[i] = bg_wind_x;
+        ctx.wind_y[i] = bg_wind_y;
         ctx.wind_z[i] = bg_wind_z;
         for (int q = 0; q < kMesoQ; ++q) {
-            ctx.f[dist_index(i, q)] = hydro_feq_2d(q, 1.0f, bg_wind_x_lattice, bg_wind_z_lattice);
-            ctx.g[dist_index(i, q)] = thermal_feq_2d(q, ctx.ambient[i], bg_wind_x_lattice, bg_wind_z_lattice);
+            ctx.f[dist_index(i, q)] = hydro_feq_3d(q, 1.0f, bg_wind_x_lattice, bg_wind_y_lattice, bg_wind_z_lattice);
+            ctx.g[dist_index(i, q)] = thermal_feq_3d(q, ctx.ambient[i], bg_wind_x_lattice, bg_wind_y_lattice, bg_wind_z_lattice);
         }
     }
 }
@@ -366,17 +400,20 @@ CellTargets compute_cell_targets(
 
     float rho = 0.0f;
     float ux = 0.0f;
+    float uy = 0.0f;
     float uz = 0.0f;
     float ambient = 0.0f;
     for (int q = 0; q < kMesoQ; ++q) {
         const float fq = ctx.f[dist_index(i, q)];
         rho += fq;
         ux += fq * static_cast<float>(kMesoCx[q]);
+        uy += fq * static_cast<float>(kMesoCy[q]);
         uz += fq * static_cast<float>(kMesoCz[q]);
         ambient += ctx.g[dist_index(i, q)];
     }
     rho = std::max(1.0e-6f, rho);
     ux /= rho;
+    uy /= rho;
     uz /= rho;
 
     const float ambient_target = forcing[base + kChAmbientTarget] + forcing[base + kChNestedAmbientDelta];
@@ -397,6 +434,7 @@ CellTargets compute_cell_targets(
     const float nested_wind_z_delta = forcing[base + kChNestedWindZDelta];
     const float bg_wind_x = forcing[base + kChBackgroundWindX] + nested_wind_x_delta + convective_inflow_x + tornado_wind_x;
     const float bg_wind_z = forcing[base + kChBackgroundWindZ] + nested_wind_z_delta + convective_inflow_z + tornado_wind_z;
+    const float bg_wind_y = nested_updraft + tornado_updraft;
     const float humidity = std::clamp(forcing[base + kChHumidity] + convective_moistening + tornado_moistening, 0.0f, 1.0f);
     const float slope_x = terrain_gradient_component(forcing, x, y, z, nx, ny, nz, 0);
     const float slope_z = terrain_gradient_component(forcing, x, y, z, nx, ny, nz, 1);
@@ -422,10 +460,16 @@ CellTargets compute_cell_targets(
     const float bg_wind_x_lattice = clamp_lattice_speed(
         bg_wind_x / std::max(1.0e-6f, transport.velocity_scale_m_s_per_lattice)
     );
+    const float bg_wind_y_lattice = clamp_lattice_speed(
+        bg_wind_y / std::max(1.0e-6f, transport.velocity_scale_m_s_per_lattice)
+    );
     const float bg_wind_z_lattice = clamp_lattice_speed(
         bg_wind_z / std::max(1.0e-6f, transport.velocity_scale_m_s_per_lattice)
     );
     const float thermal_push = 0.0008f * (next_surface - ambient);
+    const float near_surface_weight = 1.0f - static_cast<float>(y) / std::max(1.0f, static_cast<float>(ny - 1));
+    const float terrain_lift = 0.0015f * (bg_wind_x_lattice * slope_x + bg_wind_z_lattice * slope_z) * near_surface_weight;
+    const float buoyant_lift = 0.0009f * (next_surface - ambient) * near_surface_weight;
     const float terrain_steer_x = -0.005f * slope_x * bg_wind_z_lattice;
     const float terrain_steer_z = 0.005f * slope_z * bg_wind_x_lattice;
     const float drag = std::clamp(roughness * 0.02f, 0.0f, 0.25f);
@@ -435,7 +479,11 @@ CellTargets compute_cell_targets(
     const float target_uz = clamp_lattice_speed(
         bg_wind_z_lattice + terrain_steer_z + thermal_push * slope_z - drag * uz
     );
+    const float target_uy = clamp_lattice_speed(
+        bg_wind_y_lattice + terrain_lift + buoyant_lift - drag * uy
+    );
     const float relax_ux = clamp_lattice_speed((1.0f - wind_relax) * ux + wind_relax * target_ux);
+    const float relax_uy = clamp_lattice_speed((1.0f - wind_relax) * uy + wind_relax * target_uy);
     const float relax_uz = clamp_lattice_speed((1.0f - wind_relax) * uz + wind_relax * target_uz);
 
     const float thermal_source = ambient_relax * (ambient_target - ambient)
@@ -451,6 +499,7 @@ CellTargets compute_cell_targets(
     CellTargets out{};
     out.rho = rho;
     out.relax_ux = relax_ux;
+    out.relax_uy = relax_uy;
     out.relax_uz = relax_uz;
     out.thermal_eq = ambient + thermal_source;
     out.next_surface = next_surface;
@@ -469,6 +518,7 @@ void export_mesoscale_state(const MesoscaleContextState& ctx, float* out_state) 
         out_state[base + kOutDeepGround] = ctx.deep_ground[i];
         out_state[base + kOutSurface] = ctx.surface[i];
         out_state[base + kOutWindX] = ctx.wind_x[i];
+        out_state[base + kOutWindY] = ctx.wind_y[i];
         out_state[base + kOutWindZ] = ctx.wind_z[i];
     }
 }
@@ -484,10 +534,14 @@ int mesoscale_cpu_step(
     const int ny = config->ny;
     const int nz = config->nz;
     const int cells = mesoscale_cells(*config);
-    const float tau_h = std::clamp(transport.tau_shear_molecular, 0.50001f, 3.0f);
-    const float omega_h = 1.0f / tau_h;
-    const float tau_t = std::clamp(transport.tau_thermal_molecular, 0.50001f, 3.0f);
-    const float omega_t = 1.0f / tau_t;
+    const float tau_h = std::clamp(transport.tau_shear_molecular, 0.58f, 2.5f);
+    const float tau_h_odd = trt_odd_tau(tau_h);
+    const float omega_h_even = 1.0f / tau_h;
+    const float omega_h_odd = 1.0f / tau_h_odd;
+    const float tau_t = std::clamp(transport.tau_thermal_molecular, 0.58f, 2.5f);
+    const float tau_t_odd = trt_odd_tau(tau_t);
+    const float omega_t_even = 1.0f / tau_t;
+    const float omega_t_odd = 1.0f / tau_t_odd;
     const float max_speed = 0.25f * transport.velocity_scale_m_s_per_lattice;
     std::vector<float> post_f(ctx.f.size());
     std::vector<float> post_g(ctx.g.size());
@@ -502,11 +556,40 @@ int mesoscale_cpu_step(
                 next_deep[i] = targets.next_deep;
                 next_surface[i] = targets.next_surface;
                 for (int q = 0; q < kMesoQ; ++q) {
+                    const int qo = kMesoOpp[q];
+                    if (q > qo) {
+                        continue;
+                    }
                     const int d = dist_index(i, q);
-                    const float feq = hydro_feq_2d(q, targets.rho, targets.relax_ux, targets.relax_uz);
-                    const float geq = thermal_feq_2d(q, targets.thermal_eq, targets.relax_ux, targets.relax_uz);
-                    post_f[d] = ctx.f[d] - omega_h * (ctx.f[d] - feq);
-                    post_g[d] = ctx.g[d] - omega_t * (ctx.g[d] - geq);
+                    if (q == qo) {
+                        const float feq = hydro_feq_3d(q, targets.rho, targets.relax_ux, targets.relax_uy, targets.relax_uz);
+                        const float geq = thermal_feq_3d(q, targets.thermal_eq, targets.relax_ux, targets.relax_uy, targets.relax_uz);
+                        post_f[d] = ctx.f[d] - omega_h_even * (ctx.f[d] - feq);
+                        post_g[d] = ctx.g[d] - omega_t_even * (ctx.g[d] - geq);
+                        continue;
+                    }
+                    const int od = dist_index(i, qo);
+                    const float feq = hydro_feq_3d(q, targets.rho, targets.relax_ux, targets.relax_uy, targets.relax_uz);
+                    const float feq_opp = hydro_feq_3d(qo, targets.rho, targets.relax_ux, targets.relax_uy, targets.relax_uz);
+                    const float geq = thermal_feq_3d(q, targets.thermal_eq, targets.relax_ux, targets.relax_uy, targets.relax_uz);
+                    const float geq_opp = thermal_feq_3d(qo, targets.thermal_eq, targets.relax_ux, targets.relax_uy, targets.relax_uz);
+                    const float f_even = 0.5f * (ctx.f[d] + ctx.f[od]);
+                    const float f_odd = 0.5f * (ctx.f[d] - ctx.f[od]);
+                    const float feq_even = 0.5f * (feq + feq_opp);
+                    const float feq_odd = 0.5f * (feq - feq_opp);
+                    const float f_even_post = f_even - omega_h_even * (f_even - feq_even);
+                    const float f_odd_post = f_odd - omega_h_odd * (f_odd - feq_odd);
+                    post_f[d] = f_even_post + f_odd_post;
+                    post_f[od] = f_even_post - f_odd_post;
+
+                    const float g_even = 0.5f * (ctx.g[d] + ctx.g[od]);
+                    const float g_odd = 0.5f * (ctx.g[d] - ctx.g[od]);
+                    const float geq_even = 0.5f * (geq + geq_opp);
+                    const float geq_odd = 0.5f * (geq - geq_opp);
+                    const float g_even_post = g_even - omega_t_even * (g_even - geq_even);
+                    const float g_odd_post = g_odd - omega_t_odd * (g_odd - geq_odd);
+                    post_g[d] = g_even_post + g_odd_post;
+                    post_g[od] = g_even_post - g_odd_post;
                 }
             }
         }
@@ -532,27 +615,37 @@ int mesoscale_cpu_step(
                         / std::max(1.0e-6f, transport.velocity_scale_m_s_per_lattice)
                 );
                 const float boundary_temp = forcing[base + kChAmbientTarget] + forcing[base + kChNestedAmbientDelta];
+                const float boundary_bg_y = clamp_lattice_speed(
+                    (forcing[base + kChNestedUpdraft] + forcing[base + kChTornadoUpdraft])
+                        / std::max(1.0e-6f, transport.velocity_scale_m_s_per_lattice)
+                );
                 const int edge_distance = std::min(std::min(x, z), std::min(nx - 1 - x, nz - 1 - z));
-                const float edge_alpha = edge_distance <= 0
+                const int top_distance = ny - 1 - y;
+                const int sponge_distance = std::min(edge_distance, top_distance);
+                const float edge_alpha = sponge_distance <= 0
                     ? 1.0f
-                    : edge_distance < static_cast<int>(kEdgeBlendThicknessCells) ? 0.5f : 0.0f;
+                    : sponge_distance < static_cast<int>(kEdgeBlendThicknessCells) ? 0.5f : 0.0f;
                 for (int q = 0; q < kMesoQ; ++q) {
                     const int sx = x - kMesoCx[q];
+                    const int sy = y - kMesoCy[q];
                     const int sz = z - kMesoCz[q];
                     const int d = dist_index(i, q);
                     float f_value;
                     float g_value;
-                    if (sx >= 0 && sx < nx && sz >= 0 && sz < nz) {
-                        const int src = mesoscale_index(sx, y, sz, ny, nz);
+                    if (sx >= 0 && sx < nx && sy >= 0 && sy < ny && sz >= 0 && sz < nz) {
+                        const int src = mesoscale_index(sx, sy, sz, ny, nz);
                         f_value = post_f[dist_index(src, q)];
                         g_value = post_g[dist_index(src, q)];
+                    } else if (sy < 0) {
+                        f_value = post_f[dist_index(i, kMesoOpp[q])];
+                        g_value = thermal_feq_3d(q, boundary_temp, boundary_bg_x, 0.0f, boundary_bg_z);
                     } else {
-                        f_value = hydro_feq_2d(q, 1.0f, boundary_bg_x, boundary_bg_z);
-                        g_value = thermal_feq_2d(q, boundary_temp, boundary_bg_x, boundary_bg_z);
+                        f_value = hydro_feq_3d(q, 1.0f, boundary_bg_x, boundary_bg_y, boundary_bg_z);
+                        g_value = thermal_feq_3d(q, boundary_temp, boundary_bg_x, boundary_bg_y, boundary_bg_z);
                     }
                     if (edge_alpha > 0.0f) {
-                        const float f_bg = hydro_feq_2d(q, 1.0f, boundary_bg_x, boundary_bg_z);
-                        const float g_bg = thermal_feq_2d(q, boundary_temp, boundary_bg_x, boundary_bg_z);
+                        const float f_bg = hydro_feq_3d(q, 1.0f, boundary_bg_x, boundary_bg_y, boundary_bg_z);
+                        const float g_bg = thermal_feq_3d(q, boundary_temp, boundary_bg_x, boundary_bg_y, boundary_bg_z);
                         f_value = (1.0f - edge_alpha) * f_value + edge_alpha * f_bg;
                         g_value = (1.0f - edge_alpha) * g_value + edge_alpha * g_bg;
                     }
@@ -571,21 +664,25 @@ int mesoscale_cpu_step(
     for (int i = 0; i < cells; ++i) {
         float rho = 0.0f;
         float ux = 0.0f;
+        float uy = 0.0f;
         float uz = 0.0f;
         float ambient = 0.0f;
         for (int q = 0; q < kMesoQ; ++q) {
             const float fq = ctx.f[dist_index(i, q)];
             rho += fq;
             ux += fq * static_cast<float>(kMesoCx[q]);
+            uy += fq * static_cast<float>(kMesoCy[q]);
             uz += fq * static_cast<float>(kMesoCz[q]);
             ambient += ctx.g[dist_index(i, q)];
         }
         rho = std::max(1.0e-6f, rho);
         ux /= rho;
+        uy /= rho;
         uz /= rho;
         ctx.rho[i] = rho;
         ctx.ambient[i] = ambient;
         ctx.wind_x[i] = std::clamp(ux * transport.velocity_scale_m_s_per_lattice, -max_speed, max_speed);
+        ctx.wind_y[i] = std::clamp(uy * transport.velocity_scale_m_s_per_lattice, -max_speed, max_speed);
         ctx.wind_z[i] = std::clamp(uz * transport.velocity_scale_m_s_per_lattice, -max_speed, max_speed);
     }
 
@@ -1339,13 +1436,15 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_mesoscale_step_context(
     }
 
 #if defined(AERO_LBM_OPENCL)
-    if (mesoscale_opencl_step(ctx, config, transport, forcing, out_state)) {
-        return 1;
+    if (!kUseD3Q19Mesoscale) {
+        if (mesoscale_opencl_step(ctx, config, transport, forcing, out_state)) {
+            return 1;
+        }
+        release_context_gpu_buffers(ctx);
+        ctx.initialized = false;
+        seed_mesoscale_state(ctx, forcing, transport.velocity_scale_m_s_per_lattice);
+        ctx.initialized = true;
     }
-    release_context_gpu_buffers(ctx);
-    ctx.initialized = false;
-    seed_mesoscale_state(ctx, forcing, transport.velocity_scale_m_s_per_lattice);
-    ctx.initialized = true;
 #endif
 
     return mesoscale_cpu_step(ctx, config, transport, forcing, out_state);

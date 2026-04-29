@@ -23,6 +23,8 @@ final class WorldScaleDriver {
     private static final float DRIVER_SPATIAL_SCALE_X = 0.11f;
     private static final float DRIVER_SPATIAL_SCALE_Z = 0.09f;
     private static final float MAX_DRIVER_WIND_MPS = 12.0f;
+    private static final float SYNOPTIC_LULL_MIN_FACTOR = 0.18f;
+    private static final float PLANETARY_WAVE_PRESSURE_PA = 420.0f;
 
     private static final int DEFAULT_CYCLONE_CELL_COUNT = 6;
     private static final float PRESSURE_DOMAIN_CELLS = 384.0f;
@@ -31,6 +33,7 @@ final class WorldScaleDriver {
     private static final float CYCLONE_CELL_MAX_RADIUS = 30.0f;
     private static final float CYCLONE_CELL_MAX_SWIRL_MPS = 10.0f;
     private static final float CYCLONE_CELL_MAX_RADIAL_MPS = 3.0f;
+    private static final float CYCLONE_CELL_MAX_PRESSURE_ANOMALY_PA = 1350.0f;
     private static final float CYCLONE_CELL_BASE_FLOW_ADVECTION = 0.30f;
     private static final float CYCLONE_CELL_LIFECYCLE_RADIANS_PER_SECOND = TAU / (24000.0f * 2.0f / 20.0f);
     private static final float CYCLONE_CELL_OUTER_STEERING_WEIGHT = 0.55f;
@@ -42,6 +45,7 @@ final class WorldScaleDriver {
     private static final float CONVECTIVE_CLUSTER_MAX_RADIUS = 12.0f;
     private static final float CONVECTIVE_CLUSTER_MAX_CONVERGENCE_MPS = 4.0f;
     private static final float CONVECTIVE_CLUSTER_MAX_SWIRL_MPS = 2.2f;
+    private static final float CONVECTIVE_CLUSTER_THERMAL_LOW_PA = 240.0f;
     private static final float CONVECTIVE_CLUSTER_BASE_FLOW_ADVECTION = 0.60f;
     private static final float CONVECTIVE_CLUSTER_LIFECYCLE_RADIANS_PER_SECOND = TAU / (24000.0f / 20.0f);
     private static final float CONVECTIVE_CLUSTER_MIN_EFFECTIVE_ENVELOPE = 0.03f;
@@ -296,10 +300,9 @@ final class WorldScaleDriver {
         float preferredDirection = seededUnit(worldSeed, 0x15f11f73d3e4a5b1L) * TAU
             + 0.35f * MathHelper.sin(planetaryWavePhase * 0.35f)
             + 0.20f * MathHelper.cos(planetaryWavePhase * 0.18f + seededUnit(worldSeed, 0x428a2f98d728ae22L) * TAU);
-        float preferredSpeed = 1.8f
-            + seededUnit(worldSeed, 0x6a09e667f3bcc909L) * 2.2f
-            + rain * 0.8f
-            + thunder * 1.2f;
+        float fairWeatherSpeed = (1.8f + seededUnit(worldSeed, 0x6a09e667f3bcc909L) * 2.2f)
+            * synopticCalmFactor(worldSeed, planetaryWavePhase);
+        float preferredSpeed = fairWeatherSpeed + rain * 0.8f + thunder * 1.2f;
         float targetFlowX = MathHelper.cos(preferredDirection) * preferredSpeed;
         float targetFlowZ = MathHelper.sin(preferredDirection) * preferredSpeed;
         baseFlowX = relax(baseFlowX, targetFlowX, elapsedSeconds, BASE_FLOW_RELAX_PER_SECOND);
@@ -388,8 +391,10 @@ final class WorldScaleDriver {
         float eddy = MathHelper.sin((sampleX + sampleZ) * 0.55f + planetaryWavePhase * 0.25f);
 
         float activeStormActivity = finiteClamp(stormActivity, 0.0f, 1.0f, 0.0f);
-        float targetWindX = finiteOrDefault(baseFlowX, 0.0f) + 0.90f * waveA + 0.35f * eddy;
-        float targetWindZ = finiteOrDefault(baseFlowZ, 0.0f) + 0.90f * waveB - 0.35f * eddy;
+        float waveWindScale = MathHelper.lerp(synopticCalmFactor(worldSeed, planetaryWavePhase), 0.20f, 1.0f);
+        float targetWindX = finiteOrDefault(baseFlowX, 0.0f) + waveWindScale * (0.90f * waveA + 0.35f * eddy);
+        float targetWindZ = finiteOrDefault(baseFlowZ, 0.0f) + waveWindScale * (0.90f * waveB - 0.35f * eddy);
+        float pressureAnomalyPa = PLANETARY_WAVE_PRESSURE_PA * (0.70f * waveA - 0.55f * waveB + 0.35f * eddy);
         float temperatureBiasKelvin = finiteOrDefault(airmassTemperatureBias, 0.0f) + 1.4f * waveA + 0.8f * waveB;
         float humidity = finiteClamp(finiteOrDefault(airmassMoistureBias, 0.50f) + 0.08f * waveB - 0.05f * eddy, 0.0f, 1.0f, 0.50f);
         float convectiveHeatingKelvin = 0.0f;
@@ -407,6 +412,7 @@ final class WorldScaleDriver {
             CycloneContribution contribution = cell.sample(cellX, cellZ, activeStormActivity);
             targetWindX += contribution.windX();
             targetWindZ += contribution.windZ();
+            pressureAnomalyPa += contribution.pressureAnomalyPa();
             temperatureBiasKelvin += contribution.temperatureBiasKelvin();
             humidity += contribution.humidityBias();
         }
@@ -414,6 +420,7 @@ final class WorldScaleDriver {
             ConvectiveContribution contribution = cluster.sample(cellX, cellZ, activeStormActivity);
             targetWindX += contribution.windX();
             targetWindZ += contribution.windZ();
+            pressureAnomalyPa += contribution.pressureAnomalyPa();
             temperatureBiasKelvin += contribution.temperatureBiasKelvin();
             humidity += contribution.humidityBias();
             convectiveHeatingKelvin += contribution.heatingKelvin();
@@ -436,10 +443,12 @@ final class WorldScaleDriver {
 
         targetWindX = finiteClamp(targetWindX, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, 0.0f);
         targetWindZ = finiteClamp(targetWindZ, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, 0.0f);
+        pressureAnomalyPa = finiteClamp(pressureAnomalyPa, -2200.0f, 2200.0f, 0.0f);
         humidity = finiteClamp(humidity, 0.0f, 1.0f, 0.50f);
         return new Sample(
             targetWindX,
             targetWindZ,
+            pressureAnomalyPa,
             finiteOrDefault(temperatureBiasKelvin, 0.0f),
             humidity,
             activeStormActivity,
@@ -1099,6 +1108,18 @@ final class WorldScaleDriver {
         return wrapped < 0.0f ? wrapped + PRESSURE_DOMAIN_CELLS : wrapped;
     }
 
+    private static float synopticCalmFactor(long seed, float planetaryWavePhase) {
+        float phase = seededUnit(seed, 0x8c6f5d2b1a3e7c49L) * TAU;
+        float lullWave = 0.5f + 0.5f * MathHelper.sin(planetaryWavePhase * 0.23f + phase);
+        float lullEnvelope = lullWave * lullWave;
+        return MathHelper.lerp(lullEnvelope, SYNOPTIC_LULL_MIN_FACTOR, 1.0f);
+    }
+
+    private static float coriolisLatitudeSine(float cellZ) {
+        float centeredZ = wrapDomain(cellZ) - PRESSURE_DOMAIN_CELLS * 0.5f;
+        return MathHelper.clamp(centeredZ / (PRESSURE_DOMAIN_CELLS * 0.5f), -1.0f, 1.0f);
+    }
+
     private static float shortestWrappedDelta(float sample, float center) {
         float delta = wrapDomain(sample) - wrapDomain(center);
         if (delta > PRESSURE_DOMAIN_CELLS * 0.5f) {
@@ -1112,6 +1133,7 @@ final class WorldScaleDriver {
     record Sample(
         float targetWindX,
         float targetWindZ,
+        float pressureAnomalyPa,
         float temperatureBiasKelvin,
         float humidity,
         float stormActivity,
@@ -1199,15 +1221,17 @@ final class WorldScaleDriver {
     private record CycloneContribution(
         float windX,
         float windZ,
+        float pressureAnomalyPa,
         float temperatureBiasKelvin,
         float humidityBias
     ) {
-        private static final CycloneContribution ZERO = new CycloneContribution(0.0f, 0.0f, 0.0f, 0.0f);
+        private static final CycloneContribution ZERO = new CycloneContribution(0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     }
 
     private record ConvectiveContribution(
         float windX,
         float windZ,
+        float pressureAnomalyPa,
         float temperatureBiasKelvin,
         float humidityBias,
         float heatingKelvin,
@@ -1217,6 +1241,7 @@ final class WorldScaleDriver {
         float envelope
     ) {
         private static final ConvectiveContribution ZERO = new ConvectiveContribution(
+            0.0f,
             0.0f,
             0.0f,
             0.0f,
@@ -1321,7 +1346,10 @@ final class WorldScaleDriver {
             float lifecycleScale = 0.85f + 0.15f * MathHelper.sin(lifecyclePhase);
             float effectiveIntensity = intensity * stormScale * lifecycleScale;
 
-            float rotationSign = pressureSign < 0.0f ? 1.0f : -1.0f;
+            float latitudeSine = coriolisLatitudeSine(cellZ);
+            float hemisphereSign = latitudeSine >= 0.0f ? 1.0f : -1.0f;
+            float coriolisStrength = Math.max(0.25f, Math.abs(latitudeSine));
+            float rotationSign = (pressureSign < 0.0f ? 1.0f : -1.0f) * hemisphereSign;
             float tangentX = (-dz / distance) * rotationSign;
             float tangentZ = (dx / distance) * rotationSign;
             float radialX = dx / distance;
@@ -1329,12 +1357,14 @@ final class WorldScaleDriver {
             float outerSwirlSpeed = CYCLONE_CELL_MAX_SWIRL_MPS
                 * effectiveIntensity
                 * CYCLONE_CELL_OUTER_STEERING_WEIGHT
-                * outerEnvelope;
+                * outerEnvelope
+                * coriolisStrength;
             float coreSwirlSpeed = CYCLONE_CELL_MAX_SWIRL_MPS
                 * effectiveIntensity
                 * CYCLONE_CELL_CORE_SWIRL_WEIGHT
                 * coreEnvelope
-                * coreSuppression;
+                * coreSuppression
+                * coriolisStrength;
             float outerRadialSpeed = CYCLONE_CELL_MAX_RADIAL_MPS
                 * effectiveIntensity
                 * 0.70f
@@ -1349,9 +1379,14 @@ final class WorldScaleDriver {
                 + radialX * (outerRadialSpeed + coreRadialSpeed) * radialSign;
             float windZ = tangentZ * (outerSwirlSpeed + coreSwirlSpeed)
                 + radialZ * (outerRadialSpeed + coreRadialSpeed) * radialSign;
+            float pressureEnvelope = 0.30f * outerEnvelope + 0.85f * coreEnvelope;
+            float pressureAnomalyPa = pressureSign
+                * CYCLONE_CELL_MAX_PRESSURE_ANOMALY_PA
+                * effectiveIntensity
+                * pressureEnvelope;
             float temperatureBias = warmCoreBiasKelvin * effectiveIntensity * (0.35f * outerEnvelope + 0.95f * coreEnvelope);
             float humidityBias = moistureCoreBias * effectiveIntensity * (0.35f * outerEnvelope + 0.95f * coreEnvelope);
-            return new CycloneContribution(windX, windZ, temperatureBias, humidityBias);
+            return new CycloneContribution(windX, windZ, pressureAnomalyPa, temperatureBias, humidityBias);
         }
 
         private CycloneCellSnapshot snapshot() {
@@ -1585,9 +1620,13 @@ final class WorldScaleDriver {
             float moistening = Math.max(0.0f, moistureBias) * effectiveIntensity * (0.75f * coreEnvelope + 0.35f * anvilEnvelope);
             float inflowX = radialX * convergence;
             float inflowZ = radialZ * convergence;
+            float pressureAnomalyPa = -CONVECTIVE_CLUSTER_THERMAL_LOW_PA
+                * effectiveIntensity
+                * (0.80f * coreEnvelope + 0.25f * anvilEnvelope);
             return new ConvectiveContribution(
                 windX,
                 windZ,
+                pressureAnomalyPa,
                 temperatureBias,
                 humidityBias,
                 heatingKelvin,
