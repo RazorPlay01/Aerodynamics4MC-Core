@@ -69,6 +69,7 @@ final class ClientL2Solver {
     private static final float THERMAL_EMITTER_POWER_LANTERN_W = 60.0f;
     private static final float THERMAL_EMITTER_POWER_SOUL_LANTERN_W = 40.0f;
     private static final int FAN_FORCE_LENGTH_CELLS = 5;
+    private static final int FAN_FORCE_RADIUS_CELLS = 1;
     private static final int HEAT_PLUME_HEIGHT_CELLS = 4;
     private static final byte SURFACE_KIND_FAN_X_NEG = 32;
     private static final byte SURFACE_KIND_FAN_X_POS = 33;
@@ -178,7 +179,7 @@ final class ClientL2Solver {
             return;
         }
         Identifier dimensionId = world.getRegistryKey().getValue();
-        invalidateStaticCacheAround(dimensionId, pos);
+        invalidateStaticCacheForPatchFootprint(dimensionId, pos, oldState, newState);
         if (!experimentalEnabled || !streamingEnabled || clientSolveDisabled || worldKey == 0L) {
             return;
         }
@@ -864,7 +865,7 @@ final class ClientL2Solver {
     private void addFanOcclusionPatchPositions(java.util.LinkedHashSet<BlockPos> positions, BlockPos center) {
         for (Direction direction : Direction.values()) {
             for (int distance = 1; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
-                addStaticPatchPosition(positions, offset(center, direction, distance));
+                addFanDiskPatchPositions(positions, offset(center, direction, distance), direction);
             }
         }
     }
@@ -885,9 +886,7 @@ final class ClientL2Solver {
         }
         if (state.isOf(ModBlocks.FAN_BLOCK)) {
             Direction direction = state.getOrEmpty(FanBlock.FACING).orElse(Direction.NORTH);
-            for (int distance = 1; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
-                addStaticPatchPosition(positions, offset(center, direction, distance));
-            }
+            addFanFootprintPatchPositions(positions, center, direction);
         }
         if (sampleEmitterThermalPowerWatts(state) > 0.0f) {
             for (int distance = 0; distance <= HEAT_PLUME_HEIGHT_CELLS; distance++) {
@@ -904,6 +903,37 @@ final class ClientL2Solver {
         );
     }
 
+    private void addFanFootprintPatchPositions(
+        java.util.LinkedHashSet<BlockPos> positions,
+        BlockPos fanPos,
+        Direction direction
+    ) {
+        for (int distance = 1; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
+            addFanDiskPatchPositions(positions, offset(fanPos, direction, distance), direction);
+        }
+    }
+
+    private void addFanDiskPatchPositions(
+        java.util.LinkedHashSet<BlockPos> positions,
+        BlockPos center,
+        Direction direction
+    ) {
+        Direction.Axis axis = direction.getAxis();
+        for (int a = -FAN_FORCE_RADIUS_CELLS; a <= FAN_FORCE_RADIUS_CELLS; a++) {
+            for (int b = -FAN_FORCE_RADIUS_CELLS; b <= FAN_FORCE_RADIUS_CELLS; b++) {
+                addStaticPatchPosition(positions, offsetPerpendicular(center, axis, a, b));
+            }
+        }
+    }
+
+    private BlockPos offsetPerpendicular(BlockPos pos, Direction.Axis axis, int a, int b) {
+        return switch (axis) {
+            case X -> new BlockPos(pos.getX(), pos.getY() + a, pos.getZ() + b);
+            case Y -> new BlockPos(pos.getX() + a, pos.getY(), pos.getZ() + b);
+            case Z -> new BlockPos(pos.getX() + a, pos.getY() + b, pos.getZ());
+        };
+    }
+
     private boolean blockPatchTouchesActiveBrick(BlockPos center) {
         if (blockInActiveBrick(center)) {
             return true;
@@ -912,9 +942,15 @@ final class ClientL2Solver {
             if (blockInActiveBrick(center.offset(direction))) {
                 return true;
             }
-            for (int distance = 2; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
-                if (blockInActiveBrick(offset(center, direction, distance))) {
-                    return true;
+            for (int distance = 1; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
+                BlockPos fanCenter = offset(center, direction, distance);
+                Direction.Axis axis = direction.getAxis();
+                for (int a = -FAN_FORCE_RADIUS_CELLS; a <= FAN_FORCE_RADIUS_CELLS; a++) {
+                    for (int b = -FAN_FORCE_RADIUS_CELLS; b <= FAN_FORCE_RADIUS_CELLS; b++) {
+                        if (blockInActiveBrick(offsetPerpendicular(fanCenter, axis, a, b))) {
+                            return true;
+                        }
+                    }
                 }
             }
         }
@@ -977,10 +1013,23 @@ final class ClientL2Solver {
         }
     }
 
-    private void invalidateStaticCacheAround(Identifier dimensionId, BlockPos pos) {
-        invalidateStaticCacheForBlock(dimensionId, pos);
+    private void invalidateStaticCacheForPatchFootprint(
+        Identifier dimensionId,
+        BlockPos center,
+        BlockState oldState,
+        BlockState newState
+    ) {
+        java.util.LinkedHashSet<BlockPos> positions = new java.util.LinkedHashSet<>();
+        addStaticPatchPosition(positions, center);
         for (Direction direction : Direction.values()) {
-            invalidateStaticCacheForBlock(dimensionId, pos.offset(direction));
+            addStaticPatchPosition(positions, center.offset(direction));
+        }
+        addFanOcclusionPatchPositions(positions, center);
+        addHeatOcclusionPatchPositions(positions, center);
+        addForcingSourcePatchPositions(positions, center, oldState);
+        addForcingSourcePatchPositions(positions, center, newState);
+        for (BlockPos pos : positions) {
+            invalidateStaticCacheForBlock(dimensionId, pos);
         }
     }
 
@@ -1056,31 +1105,35 @@ final class ClientL2Solver {
 
     private byte fanSurfaceKindForCell(ClientWorld world, BlockPos pos) {
         for (Direction direction : Direction.values()) {
+            Direction.Axis axis = direction.getAxis();
             for (int distance = 1; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
-                int fanX = pos.getX() - direction.getOffsetX() * distance;
-                int fanY = pos.getY() - direction.getOffsetY() * distance;
-                int fanZ = pos.getZ() - direction.getOffsetZ() * distance;
-                staticNeighbor.set(fanX, fanY, fanZ);
-                BlockState fanState = world.getBlockState(staticNeighbor);
-                if (!fanState.isOf(ModBlocks.FAN_BLOCK)
-                    || fanState.getOrEmpty(FanBlock.FACING).orElse(Direction.NORTH) != direction) {
-                    continue;
+                BlockPos axialOrigin = offset(pos, direction.getOpposite(), distance);
+                for (int a = -FAN_FORCE_RADIUS_CELLS; a <= FAN_FORCE_RADIUS_CELLS; a++) {
+                    for (int b = -FAN_FORCE_RADIUS_CELLS; b <= FAN_FORCE_RADIUS_CELLS; b++) {
+                        BlockPos fanPos = offsetPerpendicular(axialOrigin, axis, -a, -b);
+                        BlockState fanState = world.getBlockState(fanPos);
+                        if (!fanState.isOf(ModBlocks.FAN_BLOCK)
+                            || fanState.getOrEmpty(FanBlock.FACING).orElse(Direction.NORTH) != direction) {
+                            continue;
+                        }
+                        if (!fanPathClear(world, fanPos, direction, distance, a, b)) {
+                            continue;
+                        }
+                        return fanSurfaceKind(direction);
+                    }
                 }
-                if (!fanPathClear(world, fanX, fanY, fanZ, direction, distance)) {
-                    continue;
-                }
-                return fanSurfaceKind(direction);
             }
         }
         return 0;
     }
 
-    private boolean fanPathClear(ClientWorld world, int fanX, int fanY, int fanZ, Direction direction, int distance) {
+    private boolean fanPathClear(ClientWorld world, BlockPos fanPos, Direction direction, int distance, int a, int b) {
+        BlockPos laneStart = offsetPerpendicular(fanPos, direction.getAxis(), a, b);
         for (int step = 1; step < distance; step++) {
             staticNeighbor.set(
-                fanX + direction.getOffsetX() * step,
-                fanY + direction.getOffsetY() * step,
-                fanZ + direction.getOffsetZ() * step
+                laneStart.getX() + direction.getOffsetX() * step,
+                laneStart.getY() + direction.getOffsetY() * step,
+                laneStart.getZ() + direction.getOffsetZ() * step
             );
             if (isSolidObstacle(world, staticNeighbor, world.getBlockState(staticNeighbor))) {
                 return false;

@@ -1357,6 +1357,29 @@ void clear_unbacked_placeholder_bricks(FluidWorldRuntime& runtime) {
     }
 }
 
+void install_static_brick_region(
+    FluidWorldRuntime& runtime,
+    BrickData& brick,
+    std::shared_ptr<StaticRegionData> static_region
+) {
+    const bool has_live_dynamic = brick.context_key != 0
+        || brick_dynamic_region_valid(runtime, brick.dynamic_region.get());
+    brick.static_region = std::move(static_region);
+    if (has_live_dynamic) {
+        brick.forcing_dirty = true;
+        brick.geometry_dirty = false;
+        brick.pending_reinit = false;
+        if (brick.dynamic_region) {
+            apply_brick_static_constraints(runtime, brick);
+        }
+    } else {
+        brick.geometry_dirty = true;
+        brick.pending_reinit = true;
+    }
+    brick.active = true;
+    brick.last_active_epoch = runtime.epoch;
+}
+
 void apply_brick_world_delta(FluidWorldRuntime& runtime, const AeroLbmWorldDelta& delta) {
     const BrickCoord coord = brick_coord_for_block(delta.x, delta.y, delta.z, runtime.brick_size);
     switch (delta.type) {
@@ -1453,11 +1476,7 @@ void apply_pending_world_deltas(ServiceState& service, long long world_key, Flui
                 continue;
             }
             BrickData& brick = runtime.bricks[upload.coord];
-            brick.static_region = upload.static_region;
-            brick.geometry_dirty = true;
-            brick.pending_reinit = true;
-            brick.active = true;
-            brick.last_active_epoch = runtime.epoch;
+            install_static_brick_region(runtime, brick, upload.static_region);
             consumed_upload_ids.push_back(delta.data1);
             touched_runtime_state = true;
             continue;
@@ -3612,11 +3631,7 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_upload_brick_world_static_brick(
 
     BrickCoord coord{brick_x, brick_y, brick_z};
     BrickData& brick = runtime.bricks[coord];
-    brick.static_region = std::move(region);
-    brick.geometry_dirty = true;
-    brick.pending_reinit = true;
-    brick.active = true;
-    brick.last_active_epoch = runtime.epoch;
+    install_static_brick_region(runtime, brick, std::move(region));
     return 1;
 }
 

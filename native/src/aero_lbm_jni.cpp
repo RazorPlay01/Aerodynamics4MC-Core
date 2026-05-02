@@ -164,7 +164,7 @@ constexpr float kBoussinesqBeta = aero_lbm::thermal_core::runtime_boussinesq_bet
     kRuntimeSecondsPerStep,
     kRuntimeMetersPerCell
 );
-constexpr float kRuntimeBuoyancyGameplayGain = 16.0f;
+constexpr float kRuntimeBuoyancyGameplayGain = 2.0f;
 constexpr float kBoussinesqForceMax = 0.02f;
 
 constexpr float kCylinderBenchmarkLength = 2.2f;
