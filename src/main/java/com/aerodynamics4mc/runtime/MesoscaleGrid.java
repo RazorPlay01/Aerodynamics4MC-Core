@@ -21,6 +21,8 @@ final class MesoscaleGrid implements AutoCloseable {
     private static final float ABL_MIN_ROUGHNESS_METERS = 0.02f;
     private static final float ABL_MAX_ROUGHNESS_METERS = 8.0f;
     private static final float MIN_ALOFT_WIND_SPEED_MPS = 0.05f;
+    private static final float MAX_L1_WIND_MPS = 9.5f;
+    private static final float MAX_L1_LATTICE_WIND = 0.35f;
     private static final float L1_TERRAIN_SLOPE_REFERENCE = 0.18f;
     private static final float L1_TERRAIN_FORM_DRAG = 0.45f;
     private static final float L1_TERRAIN_CONTOUR_DEFLECTION = 0.45f;
@@ -892,8 +894,8 @@ final class MesoscaleGrid implements AutoCloseable {
             DEFAULT_TURBULENT_PRANDTL
         );
         float maxBackgroundWind = transport != null
-            ? 0.25f * transport.velocityScaleMetersPerSecond()
-            : 32.0f;
+            ? Math.min(MAX_L1_WIND_MPS, MAX_L1_LATTICE_WIND * transport.velocityScaleMetersPerSecond())
+            : MAX_L1_WIND_MPS;
         Map<Long, Float> terrainHeightCache = new HashMap<>(cellCount + gridWidth * 4);
 
         for (int cx = centerCellX - radiusCells; cx <= centerCellX + radiusCells; cx++) {
@@ -966,8 +968,18 @@ final class MesoscaleGrid implements AutoCloseable {
                     -maxBackgroundWind,
                     maxBackgroundWind
                 );
+                WindVector cappedSurfaceTarget = clampWindMagnitude(
+                    surfaceTargetWindX,
+                    surfaceTargetWindZ,
+                    MAX_L1_WIND_MPS
+                );
+                surfaceTargetWindX = cappedSurfaceTarget.x();
+                surfaceTargetWindZ = cappedSurfaceTarget.z();
                 float aloftTargetWindX = MathHelper.clamp(geostrophicWindX, -maxBackgroundWind, maxBackgroundWind);
                 float aloftTargetWindZ = MathHelper.clamp(geostrophicWindZ, -maxBackgroundWind, maxBackgroundWind);
+                WindVector cappedAloftTarget = clampWindMagnitude(aloftTargetWindX, aloftTargetWindZ, MAX_L1_WIND_MPS);
+                aloftTargetWindX = cappedAloftTarget.x();
+                aloftTargetWindZ = cappedAloftTarget.z();
                 float aloftSpeed = windSpeed(aloftTargetWindX, aloftTargetWindZ);
                 float roughnessMeters = MathHelper.clamp(
                     finiteOrDefault(cell.roughnessLengthMeters, ABL_MIN_ROUGHNESS_METERS),
@@ -1009,6 +1021,9 @@ final class MesoscaleGrid implements AutoCloseable {
                 surfaceTargetWindZ = MathHelper.lerp(ekmanWeight, surfaceTargetWindZ, ekmanSurfaceWind.z());
                 surfaceTargetWindX = MathHelper.clamp(surfaceTargetWindX, -maxBackgroundWind, maxBackgroundWind);
                 surfaceTargetWindZ = MathHelper.clamp(surfaceTargetWindZ, -maxBackgroundWind, maxBackgroundWind);
+                cappedSurfaceTarget = clampWindMagnitude(surfaceTargetWindX, surfaceTargetWindZ, MAX_L1_WIND_MPS);
+                surfaceTargetWindX = cappedSurfaceTarget.x();
+                surfaceTargetWindZ = cappedSurfaceTarget.z();
 
                 float previousLayerWindX = surfaceTargetWindX;
                 float previousLayerWindZ = surfaceTargetWindZ;
@@ -1040,6 +1055,9 @@ final class MesoscaleGrid implements AutoCloseable {
                     float layerWindZ = MathHelper.lerp(profileBlend, layerSurfaceWindZ, aloftTargetWindZ);
                     layerWindX = MathHelper.clamp(layerWindX, -maxBackgroundWind, maxBackgroundWind);
                     layerWindZ = MathHelper.clamp(layerWindZ, -maxBackgroundWind, maxBackgroundWind);
+                    WindVector cappedLayerWind = clampWindMagnitude(layerWindX, layerWindZ, MAX_L1_WIND_MPS);
+                    layerWindX = cappedLayerWind.x();
+                    layerWindZ = cappedLayerWind.z();
                     if (terrainSolid) {
                         layerWindX = 0.0f;
                         layerWindZ = 0.0f;
@@ -1899,6 +1917,17 @@ final class MesoscaleGrid implements AutoCloseable {
             return 0.0f;
         }
         return MathHelper.sqrt(windX * windX + windZ * windZ);
+    }
+
+    private WindVector clampWindMagnitude(float windX, float windZ, float maxMagnitude) {
+        float safeX = finiteOrDefault(windX, 0.0f);
+        float safeZ = finiteOrDefault(windZ, 0.0f);
+        float speed = windSpeed(safeX, safeZ);
+        if (!(speed > maxMagnitude) || speed <= 1.0e-5f) {
+            return new WindVector(safeX, safeZ);
+        }
+        float scale = maxMagnitude / speed;
+        return new WindVector(safeX * scale, safeZ * scale);
     }
 
     private float ablProfileBlend(float heightAglBlocks, float ablHeightBlocks, float mixingStrength, float roughnessMeters) {

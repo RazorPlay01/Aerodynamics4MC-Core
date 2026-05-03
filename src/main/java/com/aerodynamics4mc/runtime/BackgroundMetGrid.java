@@ -15,8 +15,8 @@ final class BackgroundMetGrid {
     private static final float BIOME_TEMPERATURE_SCALE_K = 12.0f;
     private static final float ALTITUDE_LAPSE_RATE_K_PER_BLOCK = 0.0065f;
     private static final float DEEP_GROUND_OFFSET_K = 1.5f;
-    private static final float FLOW_RELAXATION_PER_SECOND = 1.0f / 240.0f;
-    private static final float PRESSURE_RELAXATION_PER_SECOND = 1.0f / 420.0f;
+    private static final float FLOW_RELAXATION_PER_SECOND = 1.0f / 90.0f;
+    private static final float PRESSURE_RELAXATION_PER_SECOND = 1.0f / 180.0f;
     private static final float AIR_TEMPERATURE_RELAXATION_PER_SECOND = 1.0f / 1200.0f;
     private static final float HUMIDITY_RELAXATION_PER_SECOND = 1.0f / 900.0f;
     private static final float DEEP_GROUND_RELAXATION_PER_SECOND = 1.0f / 3600.0f;
@@ -31,8 +31,8 @@ final class BackgroundMetGrid {
     private static final float MAX_DYNAMIC_WIND_MPS = 18.0f;
     private static final float MAX_PRESSURE_ANOMALY_PA = 2400.0f;
     private static final float GEOSTROPHIC_WIND_SCALE_M2_PER_PA_S = 12.0f;
-    private static final float GEOSTROPHIC_DIRECT_WIND_BLEND = 0.04f;
-    private static final float GEOSTROPHIC_FALLBACK_WIND_BLEND = 0.20f;
+    private static final float GEOSTROPHIC_DIRECT_WIND_BLEND = 0.18f;
+    private static final float GEOSTROPHIC_FALLBACK_WIND_BLEND = 0.32f;
     private static final float GEOSTROPHIC_FALLBACK_SPEED_MPS = 0.35f;
     private static final float MIN_CORIOLIS_FACTOR = 0.55f;
     private static final float MAX_HUMIDITY_RESPONSE = 0.20f;

@@ -173,7 +173,7 @@ constexpr std::array<float, kMesoQ> kMesoW = {
     1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f
 };
 constexpr float kEdgeBlendThicknessCells = 2.0f;
-constexpr float kMaxLatticeWind = 0.20f;
+constexpr float kMaxLatticeWind = 0.35f;
 
 struct CellTargets {
     float rho = 1.0f;
@@ -407,7 +407,7 @@ CellTargets compute_cell_targets(
     const float ambient_relax = std::clamp(dt / 600.0f, 0.0f, 1.0f);
     const float deep_relax = std::clamp(dt / 2400.0f, 0.0f, 1.0f);
     const float surface_relax = std::clamp(dt / 300.0f, 0.0f, 1.0f);
-    const float wind_relax = std::clamp(dt / 120.0f, 0.0f, 1.0f);
+    const float wind_relax = std::clamp(dt / 60.0f, 0.0f, 1.0f);
 
     float rho = 0.0f;
     float ux = 0.0f;
@@ -564,7 +564,7 @@ int mesoscale_cpu_step(
     const float tau_t_odd = trt_odd_tau(tau_t);
     const float omega_t_even = 1.0f / tau_t;
     const float omega_t_odd = 1.0f / tau_t_odd;
-    const float max_speed = 0.25f * transport.velocity_scale_m_s_per_lattice;
+    const float max_speed = kMaxLatticeWind * transport.velocity_scale_m_s_per_lattice;
     std::vector<float> post_f(ctx.f.size());
     std::vector<float> post_g(ctx.g.size());
     std::vector<float> next_deep(cells);
@@ -773,7 +773,7 @@ inline int dist_index(int cell, int q) {
 }
 
 inline float clamp_lattice_speed(float u) {
-    return clamp(u, -0.20f, 0.20f);
+    return clamp(u, -0.35f, 0.35f);
 }
 
 inline float hydro_feq_2d(int q, float rho, float ux, float uz) {
@@ -920,7 +920,7 @@ inline void compute_cell_targets(
     float ambient_relax = clamp(dt / 600.0f, 0.0f, 1.0f);
     float deep_relax = clamp(dt / 2400.0f, 0.0f, 1.0f);
     float surface_relax = clamp(dt / 300.0f, 0.0f, 1.0f);
-    float wind_relax = clamp(dt / 120.0f, 0.0f, 1.0f);
+    float wind_relax = clamp(dt / 60.0f, 0.0f, 1.0f);
 
     float surface_h_lap = horizontal_laplacian(surface_in, x, y, z, nx, ny, nz);
     float surface_v_lap = vertical_laplacian(surface_in, x, y, z, ny, nz);
@@ -1076,8 +1076,8 @@ __kernel void mesoscale_step(
     out_state[out_base + 0] = ambient_next;
     out_state[out_base + 1] = next_deep_self;
     out_state[out_base + 2] = next_surface_self;
-    out_state[out_base + 3] = clamp(ux_next * velocity_scale, -0.25f * velocity_scale, 0.25f * velocity_scale);
-    out_state[out_base + 4] = clamp(uz_next * velocity_scale, -0.25f * velocity_scale, 0.25f * velocity_scale);
+    out_state[out_base + 3] = clamp(ux_next * velocity_scale, -0.35f * velocity_scale, 0.35f * velocity_scale);
+    out_state[out_base + 4] = clamp(uz_next * velocity_scale, -0.35f * velocity_scale, 0.35f * velocity_scale);
 }
 )CLC";
 
@@ -1375,7 +1375,7 @@ bool mesoscale_opencl_step(
     std::swap(ctx.d_surface, ctx.d_surface_next);
     std::swap(ctx.d_deep, ctx.d_deep_next);
 
-    const float max_speed = 0.25f * transport.velocity_scale_m_s_per_lattice;
+    const float max_speed = kMaxLatticeWind * transport.velocity_scale_m_s_per_lattice;
     for (std::size_t i = 0; i < cells; ++i) {
         const int base = static_cast<int>(i) * kStateChannels;
         ctx.ambient[i] = out_state[base + kOutAmbient];

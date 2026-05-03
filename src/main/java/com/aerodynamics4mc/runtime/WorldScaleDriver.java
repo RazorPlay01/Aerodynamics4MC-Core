@@ -410,6 +410,8 @@ final class WorldScaleDriver {
 
         for (CycloneCell cell : cycloneCells) {
             CycloneContribution contribution = cell.sample(cellX, cellZ, activeStormActivity);
+            targetWindX += contribution.windX();
+            targetWindZ += contribution.windZ();
             pressureAnomalyPa += contribution.pressureAnomalyPa();
             temperatureBiasKelvin += contribution.temperatureBiasKelvin();
             humidity += contribution.humidityBias();
