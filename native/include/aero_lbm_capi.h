@@ -389,6 +389,17 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_copy_brick_world_dynamic_brick(
     float* out_air_temperature,
     float* out_surface_temperature
 );
+AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_copy_brick_world_packed_flow_atlas(
+    long long service_key,
+    long long world_key,
+    int brick_size,
+    int brick_x,
+    int brick_y,
+    int brick_z,
+    int sample_stride,
+    int16_t* out_packed_flow,
+    int packed_value_count
+);
 AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_upload_brick_world_boundary_reference_brick(
     long long service_key,
     long long world_key,

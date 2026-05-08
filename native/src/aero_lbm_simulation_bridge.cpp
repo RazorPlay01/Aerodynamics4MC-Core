@@ -132,6 +132,11 @@ struct BrickData {
     std::uint64_t last_hint_epoch = 0;
     std::uint64_t last_active_epoch = 0;
     long long context_key = 0;
+    bool compact_context_active = false;
+    bool dynamic_region_stale = false;
+    float compact_vx = 0.0f;
+    float compact_vy = 0.0f;
+    float compact_vz = 0.0f;
     std::shared_ptr<StaticRegionData> static_region;
     std::shared_ptr<DynamicRegionData> dynamic_region;
     std::shared_ptr<const DynamicRegionData> boundary_reference_region;
@@ -723,6 +728,8 @@ void release_brick_context(BrickData& brick) {
         aero_lbm_release_context(brick.context_key);
         brick.context_key = 0;
     }
+    brick.compact_context_active = false;
+    brick.dynamic_region_stale = false;
 }
 
 void prune_inactive_bricks(FluidWorldRuntime& runtime) {
@@ -930,6 +937,11 @@ bool step_brick_world_runtime(ServiceState& service, long long world_key, FluidW
                 brick.dynamic_region = std::move(constrained_brick.dynamic_region);
             } else {
                 brick.context_key = constrained_brick.context_key;
+                brick.compact_context_active = constrained_brick.compact_context_active;
+                brick.dynamic_region_stale = constrained_brick.dynamic_region_stale;
+                brick.compact_vx = constrained_brick.compact_vx;
+                brick.compact_vy = constrained_brick.compact_vy;
+                brick.compact_vz = constrained_brick.compact_vz;
                 brick.packet_cache = std::move(constrained_brick.packet_cache);
                 brick.dynamic_region = std::move(constrained_brick.dynamic_region);
             }
@@ -1352,7 +1364,28 @@ bool sync_brick_dynamic_from_context(const FluidWorldRuntime& runtime, BrickData
     if (!aero_lbm_get_temperature_state_rect(size, size, size, brick.context_key, dynamic.air_temperature.data())) {
         return false;
     }
+    brick.dynamic_region_stale = false;
     return true;
+}
+
+bool step_brick_compact_cached(BrickData& brick, int size) {
+    if (!simulation_compact_enabled()
+        || !brick.compact_context_active
+        || brick.context_key == 0
+        || brick.forcing_dirty
+        || brick.geometry_dirty
+        || brick.pending_reinit) {
+        return false;
+    }
+    bool step_ok = false;
+    if (configure_simulation_compact_boundary(brick.compact_vx, brick.compact_vy, brick.compact_vz, size, size, size)) {
+        step_ok = aero_lbm_step_rect_cached(size, size, size, brick.context_key, nullptr) != 0;
+    }
+    aero_lbm_benchmark_reset_config();
+    if (step_ok) {
+        brick.dynamic_region_stale = true;
+    }
+    return step_ok;
 }
 
 bool step_brick_actual(
@@ -1366,6 +1399,10 @@ bool step_brick_actual(
     if (brick.forcing_dirty && dynamic_has_nonzero_flow(dynamic)) {
         zero_output_fallback = std::make_shared<DynamicRegionData>(dynamic);
     }
+    const int size = runtime.brick_size;
+    if (!zero_output_fallback && step_brick_compact_cached(brick, size)) {
+        return true;
+    }
     if (!build_brick_step_packet(runtime, coord, brick, dynamic, brick.packet_cache)) {
         return false;
     }
@@ -1373,22 +1410,31 @@ bool step_brick_actual(
     if (brick.context_key == 0) {
         brick.context_key = allocate_internal_context_key(service);
     }
-    const int size = runtime.brick_size;
     bool step_ok = false;
+    bool compact_step_ok = false;
     if (simulation_compact_enabled()) {
         const CompactBrickPacketSummary compact_summary = summarize_compact_brick_packet(brick.packet_cache);
         if (compact_summary.supported
             && configure_simulation_compact_boundary(compact_summary.vx, compact_summary.vy, compact_summary.vz, size, size, size)) {
-            if (had_context) {
+            if (had_context && brick.compact_context_active) {
                 step_ok = aero_lbm_step_rect_cached(size, size, size, brick.context_key, nullptr) != 0;
             }
             if (!step_ok) {
                 step_ok = aero_lbm_step_rect(brick.packet_cache.data(), size, size, size, brick.context_key, nullptr) != 0;
             }
+            if (step_ok) {
+                compact_step_ok = true;
+                brick.compact_context_active = true;
+                brick.compact_vx = compact_summary.vx;
+                brick.compact_vy = compact_summary.vy;
+                brick.compact_vz = compact_summary.vz;
+                brick.dynamic_region_stale = true;
+            }
         }
         aero_lbm_benchmark_reset_config();
     }
     if (!step_ok) {
+        brick.compact_context_active = false;
         step_ok = aero_lbm_step_rect(brick.packet_cache.data(), size, size, size, brick.context_key, nullptr) != 0;
     }
     if (!step_ok) {
@@ -1401,6 +1447,9 @@ bool step_brick_actual(
         );
         release_brick_context(brick);
         return false;
+    }
+    if (compact_step_ok) {
+        return true;
     }
     if (!sync_brick_dynamic_from_context(runtime, brick)) {
         set_simulation_last_error(
@@ -3566,7 +3615,7 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_get_brick_world_runtime_status(
         set_simulation_last_error("simulation_get_brick_world_runtime_status: missing brick runtime");
         return 0;
     }
-    const FluidWorldRuntime& runtime = runtime_iterator->second;
+    FluidWorldRuntime& runtime = runtime_iterator->second;
     out_status[0] = runtime.brick_size;
     out_status[1] = static_cast<int>(runtime.bricks.size());
     out_status[2] = count_active_hint_bricks(runtime);
@@ -3953,6 +4002,8 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_sync_region_core_to_brick_world(
         release_brick_context(brick);
     }
     brick.dynamic_region = std::move(brick_dynamic);
+    brick.compact_context_active = false;
+    brick.dynamic_region_stale = false;
     brick.active = true;
     brick.last_active_epoch = runtime.epoch;
     return 1;
@@ -3990,7 +4041,7 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_copy_brick_world_dynamic_brick(
         set_simulation_last_error("simulation_copy_brick_world_dynamic_brick: missing brick runtime");
         return 0;
     }
-    const FluidWorldRuntime& runtime = runtime_iterator->second;
+    FluidWorldRuntime& runtime = runtime_iterator->second;
     if (runtime.brick_size != brick_size) {
         set_simulation_last_error("simulation_copy_brick_world_dynamic_brick: brick size mismatch");
         return 0;
@@ -3999,7 +4050,16 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_copy_brick_world_dynamic_brick(
     if (brick_iterator == runtime.bricks.end() || !brick_iterator->second.dynamic_region) {
         return 0;
     }
-    const DynamicRegionData& dynamic = *brick_iterator->second.dynamic_region;
+    BrickData& brick = brick_iterator->second;
+    if (brick.dynamic_region_stale && brick.context_key != 0) {
+        if (!sync_brick_dynamic_from_context(runtime, brick)) {
+            set_simulation_last_error(
+                std::string("simulation_copy_brick_world_dynamic_brick sync failed: ") + aero_lbm_last_error()
+            );
+            return 0;
+        }
+    }
+    const DynamicRegionData& dynamic = *brick.dynamic_region;
     if (!brick_dynamic_region_valid(runtime, &dynamic)) {
         set_simulation_last_error("simulation_copy_brick_world_dynamic_brick: invalid stored brick dynamic state");
         return 0;
@@ -4007,6 +4067,117 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_copy_brick_world_dynamic_brick(
     std::copy(dynamic.flow_state.begin(), dynamic.flow_state.end(), out_flow_state);
     std::copy(dynamic.air_temperature.begin(), dynamic.air_temperature.end(), out_air_temperature);
     std::copy(dynamic.surface_temperature.begin(), dynamic.surface_temperature.end(), out_surface_temperature);
+    return 1;
+}
+
+AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_copy_brick_world_packed_flow_atlas(
+    long long service_key,
+    long long world_key,
+    int brick_size,
+    int brick_x,
+    int brick_y,
+    int brick_z,
+    int sample_stride,
+    int16_t* out_packed_flow,
+    int packed_value_count
+) {
+    int cells = 0;
+    if (!checked_cell_count(brick_size, brick_size, brick_size, &cells)
+        || sample_stride <= 0
+        || !out_packed_flow) {
+        std::lock_guard<SpinMutex> lock(g_simulation_mutex);
+        set_simulation_last_error("simulation_copy_brick_world_packed_flow_atlas: invalid arguments");
+        return 0;
+    }
+    const int sx = (brick_size + sample_stride - 1) / sample_stride;
+    const int sy = sx;
+    const int sz = sx;
+    int atlas_cells = 0;
+    if (!checked_cell_count(sx, sy, sz, &atlas_cells)
+        || packed_value_count != atlas_cells * AERO_LBM_SIMULATION_PACKED_ATLAS_CHANNELS) {
+        std::lock_guard<SpinMutex> lock(g_simulation_mutex);
+        set_simulation_last_error("simulation_copy_brick_world_packed_flow_atlas: output size mismatch");
+        return 0;
+    }
+
+    std::lock_guard<SpinMutex> lock(g_simulation_mutex);
+    ServiceState* service = lookup_service(service_key);
+    if (!service) {
+        set_simulation_last_error("simulation_copy_brick_world_packed_flow_atlas: missing service");
+        return 0;
+    }
+    auto runtime_iterator = service->brick_world_runtimes.find(world_key);
+    if (runtime_iterator == service->brick_world_runtimes.end()) {
+        set_simulation_last_error("simulation_copy_brick_world_packed_flow_atlas: missing brick runtime");
+        return 0;
+    }
+    FluidWorldRuntime& runtime = runtime_iterator->second;
+    if (runtime.brick_size != brick_size) {
+        set_simulation_last_error("simulation_copy_brick_world_packed_flow_atlas: brick size mismatch");
+        return 0;
+    }
+    auto brick_iterator = runtime.bricks.find(BrickCoord{brick_x, brick_y, brick_z});
+    if (brick_iterator == runtime.bricks.end() || !brick_iterator->second.dynamic_region) {
+        return 0;
+    }
+    BrickData& brick = brick_iterator->second;
+    const float velocity_scale = runtime.dt_seconds > 0.0f
+        ? runtime.dx_meters / runtime.dt_seconds
+        : 1.0f;
+
+    if (brick.context_key != 0) {
+        thread_local std::vector<float> atlas_flow;
+        atlas_flow.assign(
+            static_cast<size_t>(atlas_cells) * AERO_LBM_SIMULATION_FLOW_STATE_CHANNELS,
+            0.0f
+        );
+        if (!aero_lbm_extract_flow_atlas_rect(
+            brick_size,
+            brick_size,
+            brick_size,
+            brick.context_key,
+            sample_stride,
+            atlas_flow.data(),
+            static_cast<int>(atlas_flow.size())
+        )) {
+            set_simulation_last_error(
+                std::string("simulation_copy_brick_world_packed_flow_atlas extract failed: ") + aero_lbm_last_error()
+            );
+            return 0;
+        }
+        for (int cell = 0; cell < atlas_cells; ++cell) {
+            const size_t src = static_cast<size_t>(cell) * AERO_LBM_SIMULATION_FLOW_STATE_CHANNELS;
+            const size_t dst = static_cast<size_t>(cell) * AERO_LBM_SIMULATION_PACKED_ATLAS_CHANNELS;
+            out_packed_flow[dst] = quantize_signed(atlas_flow[src] * velocity_scale, k_atlas_velocity_quant_range);
+            out_packed_flow[dst + 1] = quantize_signed(atlas_flow[src + 1] * velocity_scale, k_atlas_velocity_quant_range);
+            out_packed_flow[dst + 2] = quantize_signed(atlas_flow[src + 2] * velocity_scale, k_atlas_velocity_quant_range);
+            out_packed_flow[dst + 3] = quantize_signed(atlas_flow[src + 3], k_atlas_pressure_quant_range);
+        }
+        return 1;
+    }
+
+    const DynamicRegionData& dynamic = *brick.dynamic_region;
+    if (!brick_dynamic_region_valid(runtime, &dynamic)) {
+        set_simulation_last_error("simulation_copy_brick_world_packed_flow_atlas: invalid stored brick dynamic state");
+        return 0;
+    }
+    size_t dst = 0;
+    for (int x = 0; x < sx; ++x) {
+        const int gx = std::min(brick_size - 1, x * sample_stride);
+        for (int y = 0; y < sy; ++y) {
+            const int gy = std::min(brick_size - 1, y * sample_stride);
+            for (int z = 0; z < sz; ++z) {
+                const int gz = std::min(brick_size - 1, z * sample_stride);
+                const int src_cell = grid_cell_index(brick_size, brick_size, gx, gy, gz);
+                const size_t src = static_cast<size_t>(src_cell) * AERO_LBM_SIMULATION_FLOW_STATE_CHANNELS;
+                out_packed_flow[dst] = quantize_signed(dynamic.flow_state[src] * velocity_scale, k_atlas_velocity_quant_range);
+                out_packed_flow[dst + 1] = quantize_signed(dynamic.flow_state[src + 1] * velocity_scale, k_atlas_velocity_quant_range);
+                out_packed_flow[dst + 2] = quantize_signed(dynamic.flow_state[src + 2] * velocity_scale, k_atlas_velocity_quant_range);
+                out_packed_flow[dst + 3] = quantize_signed(dynamic.flow_state[src + 3], k_atlas_pressure_quant_range);
+                dst += AERO_LBM_SIMULATION_PACKED_ATLAS_CHANNELS;
+            }
+        }
+    }
     return 1;
 }
 
@@ -4064,6 +4235,8 @@ AERO_LBM_CAPI_EXPORT int aero_lbm_simulation_upload_brick_world_dynamic_brick(
         release_brick_context(brick);
     }
     brick.dynamic_region = std::move(dynamic);
+    brick.compact_context_active = false;
+    brick.dynamic_region_stale = false;
     brick.active = true;
     brick.last_active_epoch = runtime.epoch;
     brick.pending_reinit = false;
@@ -6073,6 +6246,49 @@ JNIEXPORT jboolean JNICALL Java_com_aerodynamics4mc_runtime_NativeSimulationBrid
     env->ReleaseFloatArrayElements(out_flow_state, flow_ptr, ok ? 0 : JNI_ABORT);
     env->ReleaseFloatArrayElements(out_air_temperature, air_ptr, ok ? 0 : JNI_ABORT);
     env->ReleaseFloatArrayElements(out_surface_temperature, surface_ptr, ok ? 0 : JNI_ABORT);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_aerodynamics4mc_runtime_NativeSimulationBridge_nativeCopyBrickWorldPackedFlowAtlas(
+    JNIEnv* env,
+    jclass,
+    jlong service_key,
+    jlong world_key,
+    jint brick_size,
+    jint brick_x,
+    jint brick_y,
+    jint brick_z,
+    jint sample_stride,
+    jshortArray out_packed_flow
+) {
+    if (!out_packed_flow || sample_stride <= 0) {
+        return JNI_FALSE;
+    }
+    const int atlas_resolution = (brick_size + sample_stride - 1) / sample_stride;
+    const int atlas_cells = atlas_resolution * atlas_resolution * atlas_resolution;
+    const int packed_values = atlas_cells * AERO_LBM_SIMULATION_PACKED_ATLAS_CHANNELS;
+    if (atlas_resolution <= 0
+        || atlas_cells <= 0
+        || env->GetArrayLength(out_packed_flow) != static_cast<jsize>(packed_values)) {
+        return JNI_FALSE;
+    }
+    jboolean packed_copy = JNI_FALSE;
+    jshort* packed_ptr = env->GetShortArrayElements(out_packed_flow, &packed_copy);
+    if (!packed_ptr) {
+        return JNI_FALSE;
+    }
+    const int ok = aero_lbm_simulation_copy_brick_world_packed_flow_atlas(
+        static_cast<long long>(service_key),
+        static_cast<long long>(world_key),
+        brick_size,
+        brick_x,
+        brick_y,
+        brick_z,
+        sample_stride,
+        reinterpret_cast<int16_t*>(packed_ptr),
+        packed_values
+    );
+    env->ReleaseShortArrayElements(out_packed_flow, packed_ptr, ok ? 0 : JNI_ABORT);
     return ok ? JNI_TRUE : JNI_FALSE;
 }
 

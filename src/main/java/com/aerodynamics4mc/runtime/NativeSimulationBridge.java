@@ -30,6 +30,7 @@ public final class NativeSimulationBridge {
     private static final String LOAD_ERROR;
     private static volatile boolean nestedFeedbackStatusSupported = true;
     private static volatile boolean exactActiveHintsSupported = true;
+    private static volatile boolean packedBrickAtlasSupported = true;
 
     static {
         boolean loaded = false;
@@ -377,6 +378,44 @@ public final class NativeSimulationBridge {
             outAirTemperature,
             outSurfaceTemperature
         );
+    }
+
+    public boolean copyBrickWorldPackedFlowAtlas(
+        long serviceKey,
+        long worldKey,
+        int brickSize,
+        int brickX,
+        int brickY,
+        int brickZ,
+        int sampleStride,
+        short[] outPackedFlow
+    ) {
+        if (!LOADED || !packedBrickAtlasSupported || serviceKey == 0L || worldKey == 0L || brickSize <= 0) {
+            return false;
+        }
+        if (sampleStride <= 0 || outPackedFlow == null) {
+            return false;
+        }
+        int atlasResolution = (brickSize + sampleStride - 1) / sampleStride;
+        int values = checkedCellCount(atlasResolution, atlasResolution, atlasResolution);
+        if (values <= 0 || outPackedFlow.length != values * PACKED_ATLAS_CHANNELS) {
+            return false;
+        }
+        try {
+            return nativeCopyBrickWorldPackedFlowAtlas(
+                serviceKey,
+                worldKey,
+                brickSize,
+                brickX,
+                brickY,
+                brickZ,
+                sampleStride,
+                outPackedFlow
+            );
+        } catch (UnsatisfiedLinkError error) {
+            packedBrickAtlasSupported = false;
+            return false;
+        }
     }
 
     public boolean uploadBrickWorldDynamicBrick(
@@ -1242,6 +1281,16 @@ public final class NativeSimulationBridge {
         float[] outFlowState,
         float[] outAirTemperature,
         float[] outSurfaceTemperature
+    );
+    private static native boolean nativeCopyBrickWorldPackedFlowAtlas(
+        long serviceKey,
+        long worldKey,
+        int brickSize,
+        int brickX,
+        int brickY,
+        int brickZ,
+        int sampleStride,
+        short[] outPackedFlow
     );
     private static native boolean nativeUploadBrickWorldDynamicBrick(
         long serviceKey,

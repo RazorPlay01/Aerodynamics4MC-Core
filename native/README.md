@@ -44,6 +44,7 @@ Current native code includes:
   - experimental game-side stored-region opt-in: set `AERO_LBM_SIMULATION_COMPACT=1` to route simple `step_region_stored` calls without sparse overlays or nested/tornado boundary overrides through the compact path
   - experimental game-side brick opt-in: with `AERO_LBM_SIMULATION_COMPACT=1`, `BrickWorldRuntime` tries the same compact path for bricks whose packet has no fan or thermal forcing, then falls back to D3Q27 when unsupported
   - client-local L2 brick size can be raised for profiling with `AERO_LBM_CLIENT_L2_BRICK_SIZE=128`; the default remains `32`
+  - client-local L2 publishes packed flow atlases through native code; `128^3` defaults to `AERO_LBM_CLIENT_L2_PUBLISH_SAMPLE_STRIDE=4` to avoid full-field Java readback every frame
 - CPU reference `D3Q27` path (automatic fallback):
   - per-window context state (`contextKey`)
   - cumulant + SGS + thermal scalar + Boussinesq force

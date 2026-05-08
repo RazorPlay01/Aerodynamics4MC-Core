@@ -95,7 +95,7 @@ final class AeroVisualizer {
         remoteWindows.put(key, RemoteFlowField.fromPayload(payload, clientTickCounter));
     }
 
-    void onLocalFlowField(Identifier dimensionId, BlockPos origin, short[] packedFlow) {
+    void onLocalFlowField(Identifier dimensionId, BlockPos origin, int sampleStride, short[] packedFlow) {
         if (!streamingEnabled || packedFlow == null || packedFlow.length == 0) {
             return;
         }
@@ -106,7 +106,7 @@ final class AeroVisualizer {
             RemoteFlowField.fromPacked(
                 dimensionId,
                 origin,
-                1,
+                Math.max(1, sampleStride),
                 localPackedFlow,
                 AeroWindSample.Authority.CLIENT_LOCAL,
                 clientTickCounter

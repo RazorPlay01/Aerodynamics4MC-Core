@@ -46,6 +46,13 @@ final class ClientL2Solver {
         1,
         200
     );
+    private static final int LOCAL_PUBLISH_SAMPLE_STRIDE = configuredInt(
+        "a4mc.clientL2.publishSampleStride",
+        "AERO_LBM_CLIENT_L2_PUBLISH_SAMPLE_STRIDE",
+        BRICK_SIZE >= 128 ? 4 : 1,
+        1,
+        16
+    );
     private static final int SOLVE_INTERVAL_TICKS = configuredInt(
         "a4mc.clientL2.solveIntervalTicks",
         "AERO_LBM_CLIENT_L2_SOLVE_INTERVAL_TICKS",
@@ -380,7 +387,12 @@ final class ClientL2Solver {
     private void drainWorkerAtlases() {
         LocalAtlasSnapshot snapshot;
         while ((snapshot = worker.pollAtlas()) != null) {
-            visualizer.onLocalFlowField(snapshot.dimensionId(), snapshot.origin(), snapshot.packedFlow());
+            visualizer.onLocalFlowField(
+                snapshot.dimensionId(),
+                snapshot.origin(),
+                snapshot.sampleStride(),
+                snapshot.packedFlow()
+            );
         }
     }
 
@@ -1495,7 +1507,7 @@ final class ClientL2Solver {
     private record PublishTarget(Identifier dimensionId, BlockPos origin, int brickX, int brickY, int brickZ) {
     }
 
-    private record LocalAtlasSnapshot(Identifier dimensionId, BlockPos origin, short[] packedFlow) {
+    private record LocalAtlasSnapshot(Identifier dimensionId, BlockPos origin, int sampleStride, short[] packedFlow) {
     }
 
     private final class ClientL2Worker {
@@ -1803,42 +1815,72 @@ final class ClientL2Solver {
         private void publishTargets(long worldKey, PublishTarget[] targets) {
             long start = System.nanoTime();
             for (PublishTarget target : targets) {
-                if (!bridge.copyBrickWorldDynamicBrick(
+                int sampleStride = LOCAL_PUBLISH_SAMPLE_STRIDE;
+                short[] packedFlow = new short[packedValueCount(BRICK_SIZE, sampleStride)];
+                if (!bridge.copyBrickWorldPackedFlowAtlas(
                     serviceKey,
                     worldKey,
                     BRICK_SIZE,
                     target.brickX(),
                     target.brickY(),
                     target.brickZ(),
-                    workerFlowState,
-                    workerAirTemperature,
-                    workerSurfaceTemperature
+                    sampleStride,
+                    packedFlow
                 )) {
-                    lastError = "copyBrickWorldDynamicBrick failed: " + bridge.lastError();
-                    continue;
+                    if (!bridge.copyBrickWorldDynamicBrick(
+                        serviceKey,
+                        worldKey,
+                        BRICK_SIZE,
+                        target.brickX(),
+                        target.brickY(),
+                        target.brickZ(),
+                        workerFlowState,
+                        workerAirTemperature,
+                        workerSurfaceTemperature
+                    )) {
+                        lastError = "copyBrickWorldDynamicBrick failed: " + bridge.lastError();
+                        continue;
+                    }
+                    packFlowFromWorkerState(sampleStride, packedFlow);
                 }
-                short[] packedFlow = new short[CELL_COUNT * PACKED_CHANNELS];
-                for (int cell = 0; cell < CELL_COUNT; cell++) {
-                    int srcBase = cell * FLOW_CHANNELS;
-                    int dstBase = cell * PACKED_CHANNELS;
-                    packedFlow[dstBase] = quantizeSignedToShort(
-                        workerFlowState[srcBase] * NATIVE_VELOCITY_SCALE,
-                        ATLAS_VELOCITY_RANGE
-                    );
-                    packedFlow[dstBase + 1] = quantizeSignedToShort(
-                        workerFlowState[srcBase + 1] * NATIVE_VELOCITY_SCALE,
-                        ATLAS_VELOCITY_RANGE
-                    );
-                    packedFlow[dstBase + 2] = quantizeSignedToShort(
-                        workerFlowState[srcBase + 2] * NATIVE_VELOCITY_SCALE,
-                        ATLAS_VELOCITY_RANGE
-                    );
-                    packedFlow[dstBase + 3] = quantizeSignedToShort(workerFlowState[srcBase + 3], ATLAS_PRESSURE_RANGE);
-                }
-                atlases.offer(new LocalAtlasSnapshot(target.dimensionId(), target.origin(), packedFlow));
+                atlases.offer(new LocalAtlasSnapshot(target.dimensionId(), target.origin(), sampleStride, packedFlow));
                 publishedAtlases++;
             }
             lastPublishNanos = System.nanoTime() - start;
+        }
+
+        private int packedValueCount(int brickSize, int sampleStride) {
+            int atlasResolution = (brickSize + sampleStride - 1) / sampleStride;
+            return atlasResolution * atlasResolution * atlasResolution * PACKED_CHANNELS;
+        }
+
+        private void packFlowFromWorkerState(int sampleStride, short[] packedFlow) {
+            int atlasResolution = (BRICK_SIZE + sampleStride - 1) / sampleStride;
+            int dstBase = 0;
+            for (int x = 0; x < atlasResolution; x++) {
+                int gx = Math.min(BRICK_SIZE - 1, x * sampleStride);
+                for (int y = 0; y < atlasResolution; y++) {
+                    int gy = Math.min(BRICK_SIZE - 1, y * sampleStride);
+                    for (int z = 0; z < atlasResolution; z++) {
+                        int gz = Math.min(BRICK_SIZE - 1, z * sampleStride);
+                        int srcBase = cellIndex(gx, gy, gz) * FLOW_CHANNELS;
+                        packedFlow[dstBase] = quantizeSignedToShort(
+                            workerFlowState[srcBase] * NATIVE_VELOCITY_SCALE,
+                            ATLAS_VELOCITY_RANGE
+                        );
+                        packedFlow[dstBase + 1] = quantizeSignedToShort(
+                            workerFlowState[srcBase + 1] * NATIVE_VELOCITY_SCALE,
+                            ATLAS_VELOCITY_RANGE
+                        );
+                        packedFlow[dstBase + 2] = quantizeSignedToShort(
+                            workerFlowState[srcBase + 2] * NATIVE_VELOCITY_SCALE,
+                            ATLAS_VELOCITY_RANGE
+                        );
+                        packedFlow[dstBase + 3] = quantizeSignedToShort(workerFlowState[srcBase + 3], ATLAS_PRESSURE_RANGE);
+                        dstBase += PACKED_CHANNELS;
+                    }
+                }
+            }
         }
 
         private void updateNativeStatus(long worldKey) {
@@ -1898,6 +1940,7 @@ final class ClientL2Solver {
             + " heatPatchCells=" + lastHeatPatchCellCount
             + " solveInterval=" + SOLVE_INTERVAL_TICKS
             + " publishInterval=" + LOCAL_PUBLISH_INTERVAL_TICKS
+            + " publishStride=" + LOCAL_PUBLISH_SAMPLE_STRIDE
             + " maxActive=" + MAX_CLIENT_ACTIVE_BRICKS
             + " prepBudget=" + STATIC_BUILD_CELLS_PER_TICK
             + " seedBudget=" + COARSE_SEED_CELLS_PER_TICK
