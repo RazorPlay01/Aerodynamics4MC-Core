@@ -4474,12 +4474,8 @@ kernel void d3q27_f16_step_odd(
         int sx = x - CX[q];
         int sy = y - CY[q];
         int sz = z - CZ[q];
-        if (sx < 0) {
+        if (sx < 0 || sx >= nx || sy < 0 || sy >= ny || sz < 0 || sz >= nz) {
             fi[q] = feq(q, clampf(1.0f + inlet_value.w, RHO_MIN, RHO_MAX), inlet_value.x, inlet_value.y, inlet_value.z);
-            continue;
-        }
-        if (sx >= nx || sy < 0 || sy >= ny || sz < 0 || sz >= nz) {
-            fi[q] = d3q27_f16_load(f, q, cells, cell);
             continue;
         }
         int src = (sx * ny + sy) * nz + sz;
@@ -4492,12 +4488,14 @@ kernel void d3q27_f16_step_odd(
 
     d3q27_f16_collide_srt(fi, omega, inlet_value, x <= 0 ? 1 : 0);
 
+    float boundary_rho = clampf(1.0f + inlet_value.w, RHO_MIN, RHO_MAX);
     for (int q = 0; q < KQ; ++q) {
         int dx = x + CX[q];
         int dy = y + CY[q];
         int dz = z + CZ[q];
         if (dx <= 0 || dx >= nx || dy < 0 || dy >= ny || dz < 0 || dz >= nz) {
-            d3q27_f16_store(f, OPP[q], cells, cell, fi[q]);
+            int opp = OPP[q];
+            d3q27_f16_store(f, opp, cells, cell, feq(opp, boundary_rho, inlet_value.x, inlet_value.y, inlet_value.z));
             continue;
         }
         int dst = (dx * ny + dy) * nz + dz;
@@ -4521,7 +4519,8 @@ inline float d3q27_f16_read_physical(
     int y,
     int z,
     int q,
-    int parity
+    int parity,
+    float4 inlet_value
 ) {
     if (parity == 0) {
         return d3q27_f16_load(f, q, cells, cell);
@@ -4530,7 +4529,7 @@ inline float d3q27_f16_read_physical(
     int sy = y - CY[q];
     int sz = z - CZ[q];
     if (sx < 0 || sx >= nx || sy < 0 || sy >= ny || sz < 0 || sz >= nz) {
-        return d3q27_f16_load(f, q, cells, cell);
+        return feq(q, clampf(1.0f + inlet_value.w, RHO_MIN, RHO_MAX), inlet_value.x, inlet_value.y, inlet_value.z);
     }
     int src = (sx * ny + sy) * nz + sz;
     return solid[src] != 0
@@ -4589,7 +4588,7 @@ kernel void d3q27_f16_output_macro_strided(
     float uy = 0.0f;
     float uz = 0.0f;
     for (int q = 0; q < KQ; ++q) {
-        float fq = fmax(d3q27_f16_read_physical(f, solid, nx, ny, nz, cells, cell, gx, gy, gz, q, parity), 0.0f);
+        float fq = fmax(d3q27_f16_read_physical(f, solid, nx, ny, nz, cells, cell, gx, gy, gz, q, parity, inlet_value), 0.0f);
         rho += fq;
         ux += fq * (float)CX[q];
         uy += fq * (float)CY[q];
@@ -7768,6 +7767,8 @@ static bool native_sample_flow_point_raw_dims_impl(
         }
 
         const int parity = ctx.d3q27_f16_parity;
+        const OpenClFaceData inlet = compact_inlet_value();
+        const float boundary_rho = clampf(1.0f + inlet[3], kRhoMin, kRhoMax);
         float rho = 0.0f;
         float ux = 0.0f;
         float uy = 0.0f;
@@ -7775,6 +7776,7 @@ static bool native_sample_flow_point_raw_dims_impl(
         for (int q = 0; q < kQ; ++q) {
             std::size_t src_cell = cell;
             int src_q = q;
+            bool use_boundary = false;
             if (parity != 0) {
                 const int sx = sample_x - kCx[q];
                 const int sy = sample_y - kCy[q];
@@ -7785,26 +7787,34 @@ static bool native_sample_flow_point_raw_dims_impl(
                         src_cell = neighbor;
                         src_q = kOpp[q];
                     }
+                } else {
+                    use_boundary = true;
                 }
             }
-            std::uint16_t packed = 0;
-            const std::size_t offset = dist_index(src_cell, src_q, cells) * sizeof(std::uint16_t);
-            cl_int err = clEnqueueReadBuffer(
-                g_opencl.queue,
-                ctx.d_d3q27_f16,
-                CL_TRUE,
-                offset,
-                sizeof(std::uint16_t),
-                &packed,
-                0,
-                nullptr,
-                nullptr
-            );
-            if (err != CL_SUCCESS) {
-                g_opencl.error = format_opencl_api_error("clEnqueueReadBuffer(sample_flow_point:d3q27_f16)", err);
-                return false;
+            float fq = 0.0f;
+            if (use_boundary) {
+                fq = feq(q, boundary_rho, inlet[0], inlet[1], inlet[2]);
+            } else {
+                std::uint16_t packed = 0;
+                const std::size_t offset = dist_index(src_cell, src_q, cells) * sizeof(std::uint16_t);
+                cl_int err = clEnqueueReadBuffer(
+                    g_opencl.queue,
+                    ctx.d_d3q27_f16,
+                    CL_TRUE,
+                    offset,
+                    sizeof(std::uint16_t),
+                    &packed,
+                    0,
+                    nullptr,
+                    nullptr
+                );
+                if (err != CL_SUCCESS) {
+                    g_opencl.error = format_opencl_api_error("clEnqueueReadBuffer(sample_flow_point:d3q27_f16)", err);
+                    return false;
+                }
+                fq = half_bits_to_float(packed);
             }
-            const float fq = std::max(0.0f, half_bits_to_float(packed));
+            fq = std::max(0.0f, fq);
             if (!std::isfinite(fq)) {
                 write_zero();
                 return true;
