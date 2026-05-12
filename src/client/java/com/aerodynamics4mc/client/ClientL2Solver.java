@@ -65,14 +65,14 @@ final class ClientL2Solver {
     private static final int STATIC_BUILD_CELLS_PER_TICK = configuredInt(
         "a4mc.clientL2.staticBuildCellsPerTick",
         "AERO_LBM_CLIENT_L2_STATIC_BUILD_CELLS_PER_TICK",
-        BRICK_SIZE >= 128 ? 65536 : 1024,
+        BRICK_SIZE >= 128 ? 8192 : 1024,
         1,
         CELL_COUNT
     );
     private static final int COARSE_SEED_CELLS_PER_TICK = configuredInt(
         "a4mc.clientL2.coarseSeedCellsPerTick",
         "AERO_LBM_CLIENT_L2_COARSE_SEED_CELLS_PER_TICK",
-        BRICK_SIZE >= 128 ? 131072 : 4096,
+        BRICK_SIZE >= 128 ? 65536 : 4096,
         1,
         CELL_COUNT
     );
@@ -83,6 +83,27 @@ final class ClientL2Solver {
         1,
         CELL_COUNT
     );
+    private static final long STATIC_BUILD_NANOS_PER_TICK = configuredInt(
+        "a4mc.clientL2.staticBuildMicrosPerTick",
+        "AERO_LBM_CLIENT_L2_STATIC_BUILD_MICROS_PER_TICK",
+        BRICK_SIZE >= 128 ? 1500 : 1000,
+        100,
+        50000
+    ) * 1000L;
+    private static final long COARSE_SEED_NANOS_PER_TICK = configuredInt(
+        "a4mc.clientL2.coarseSeedMicrosPerTick",
+        "AERO_LBM_CLIENT_L2_COARSE_SEED_MICROS_PER_TICK",
+        BRICK_SIZE >= 128 ? 1000 : 1000,
+        100,
+        50000
+    ) * 1000L;
+    private static final long BOUNDARY_REFERENCE_NANOS_PER_TICK = configuredInt(
+        "a4mc.clientL2.boundaryReferenceMicrosPerTick",
+        "AERO_LBM_CLIENT_L2_BOUNDARY_REFERENCE_MICROS_PER_TICK",
+        BRICK_SIZE >= 128 ? 1000 : 1000,
+        100,
+        50000
+    ) * 1000L;
     private static final int STRESS_PATCHES_PER_TICK = configuredInt(
         "a4mc.clientL2.stressPatchesPerTick",
         "AERO_LBM_CLIENT_L2_STRESS_PATCHES_PER_TICK",
@@ -191,7 +212,11 @@ final class ClientL2Solver {
         WORKER_QUEUE_CAPACITY
     );
     private static final int ALL_OPEN_FACE_MASK = (1 << FACE_COUNT) - 1;
-    private static final boolean CLIENT_L2_DEFAULT_ENABLED = true;
+    private static final boolean CLIENT_L2_DEFAULT_ENABLED = configuredBoolean(
+        "a4mc.clientL2.enabled",
+        "AERO_LBM_CLIENT_L2_ENABLED",
+        false
+    );
 
     private enum StressMode {
         OFF,
@@ -277,6 +302,11 @@ final class ClientL2Solver {
     private boolean stagedStaticUploaded;
     private boolean stagedDynamicUploaded;
     private boolean stagedStaticFromCache;
+    private boolean stagedCoarseSeedReady;
+    private float stagedSeedVx;
+    private float stagedSeedVy;
+    private float stagedSeedVz;
+    private float stagedSeedPressure;
     private BlockPos stagedOrigin;
     private Identifier stagedDimension;
     private int boundaryRefreshActiveIndex = -1;
@@ -356,6 +386,24 @@ final class ClientL2Solver {
         }
     }
 
+    private static boolean configuredBoolean(String propertyName, String envName, boolean defaultValue) {
+        String value = System.getProperty(propertyName);
+        if (value == null || value.isBlank()) {
+            value = System.getenv(envName);
+        }
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        return switch (value.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "1", "true", "yes", "on", "enable", "enabled" -> true;
+            case "0", "false", "no", "off", "disable", "disabled" -> false;
+            default -> {
+                LOGGER.warn("Client L2 config {}={} is not a boolean; using {}", propertyName, value, defaultValue);
+                yield defaultValue;
+            }
+        };
+    }
+
     void initialize() {
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> close());
@@ -388,9 +436,12 @@ final class ClientL2Solver {
         if (world == null || pos == null || oldState == newState || (oldState != null && oldState.equals(newState))) {
             return;
         }
+        if (!experimentalEnabled) {
+            return;
+        }
         Identifier dimensionId = world.getRegistryKey().getValue();
         invalidateStaticCacheForPatchFootprint(dimensionId, pos, oldState, newState);
-        if (!experimentalEnabled || !streamingEnabled || clientSolveDisabled || worldKey == 0L) {
+        if (!streamingEnabled || clientSolveDisabled || worldKey == 0L) {
             return;
         }
         if (activeDimension == null || !activeDimension.equals(dimensionId) || activeBrickCount <= 0) {
@@ -436,10 +487,10 @@ final class ClientL2Solver {
         int localX = playerBlockPos.getX() - origin.getX();
         int localY = playerBlockPos.getY() - origin.getY();
         int localZ = playerBlockPos.getZ() - origin.getZ();
+        boolean dimensionChanged = activeDimension == null || !activeDimension.equals(dimensionId);
         boolean originChanged = activeOrigin == null
             || !activeOrigin.equals(origin)
-            || activeDimension == null
-            || !activeDimension.equals(dimensionId);
+            || dimensionChanged;
         boolean activeSetChanged = originChanged || !activeSetMatches(brickX, brickY, brickZ, localX, localY, localZ);
         if (activeSetChanged) {
             activeOrigin = origin;
@@ -455,7 +506,9 @@ final class ClientL2Solver {
             lastBoundaryRefreshClientGameTime = Long.MIN_VALUE;
             lastStaticPatchSubmitClientGameTime = Long.MIN_VALUE;
             stressStaticSubmittedForActiveSet = false;
-            visualizer.clearLocalFlowFields();
+            if (dimensionChanged) {
+                visualizer.clearLocalFlowFields();
+            }
             ticksSinceStaticRefresh = 0;
         }
 
@@ -989,6 +1042,11 @@ final class ClientL2Solver {
         stagedStaticUploaded = false;
         stagedDynamicUploaded = false;
         stagedStaticFromCache = false;
+        stagedCoarseSeedReady = false;
+        stagedSeedVx = 0.0f;
+        stagedSeedVy = 0.0f;
+        stagedSeedVz = 0.0f;
+        stagedSeedPressure = 0.0f;
         java.util.Arrays.fill(obstacle, (byte) 0);
         java.util.Arrays.fill(surfaceKind, (byte) 0);
         java.util.Arrays.fill(openFaceMask, (short) 0);
@@ -1012,7 +1070,9 @@ final class ClientL2Solver {
         if (stagedOrigin == null) {
             return false;
         }
+        long deadline = System.nanoTime() + STATIC_BUILD_NANOS_PER_TICK;
         int end = Math.min(CELL_COUNT, stagedStaticCursor + STATIC_BUILD_CELLS_PER_TICK);
+        int built = 0;
         while (stagedStaticCursor < end) {
             int cell = stagedStaticCursor++;
             int x = cell / (BRICK_SIZE * BRICK_SIZE);
@@ -1020,6 +1080,10 @@ final class ClientL2Solver {
             int y = rem / BRICK_SIZE;
             int z = rem - y * BRICK_SIZE;
             populateStaticCell(world, stagedOrigin, x, y, z);
+            built++;
+            if ((built & 255) == 0 && System.nanoTime() >= deadline) {
+                break;
+            }
         }
         return stagedStaticCursor >= CELL_COUNT;
     }
@@ -1039,31 +1103,43 @@ final class ClientL2Solver {
         if (stagedOrigin == null) {
             return false;
         }
+        if (!stagedCoarseSeedReady) {
+            Vec3d center = new Vec3d(
+                stagedOrigin.getX() + BRICK_SIZE * 0.5,
+                stagedOrigin.getY() + BRICK_SIZE * 0.5,
+                stagedOrigin.getZ() + BRICK_SIZE * 0.5
+            );
+            AeroWindSample coarse = visualizer.sampleServerCoarseFlow(dimensionId, center);
+            if (!coarse.hasFlow()) {
+                return false;
+            }
+            stagedSeedVx = coarse.velocityX() / NATIVE_VELOCITY_SCALE;
+            stagedSeedVy = coarse.velocityY() / NATIVE_VELOCITY_SCALE;
+            stagedSeedVz = coarse.velocityZ() / NATIVE_VELOCITY_SCALE;
+            stagedSeedPressure = coarse.pressure();
+            stagedCoarseSeedReady = true;
+        }
+        long deadline = System.nanoTime() + COARSE_SEED_NANOS_PER_TICK;
         int built = 0;
         while (stagedSeedCursor < CELL_COUNT && built < COARSE_SEED_CELLS_PER_TICK) {
             int cell = stagedSeedCursor;
-            int x = cell / (BRICK_SIZE * BRICK_SIZE);
-            int rem = cell - x * BRICK_SIZE * BRICK_SIZE;
-            int y = rem / BRICK_SIZE;
-            int z = rem - y * BRICK_SIZE;
+            int base = cell * FLOW_CHANNELS;
             if (obstacle[cell] == 0) {
-                Vec3d pos = new Vec3d(
-                    stagedOrigin.getX() + x + 0.5,
-                    stagedOrigin.getY() + y + 0.5,
-                    stagedOrigin.getZ() + z + 0.5
-                );
-                AeroWindSample coarse = visualizer.sampleServerCoarseFlow(dimensionId, pos);
-                if (!coarse.hasFlow()) {
-                    return false;
-                }
-                int base = cell * FLOW_CHANNELS;
-                flowState[base] = coarse.velocityX() / NATIVE_VELOCITY_SCALE;
-                flowState[base + 1] = coarse.velocityY() / NATIVE_VELOCITY_SCALE;
-                flowState[base + 2] = coarse.velocityZ() / NATIVE_VELOCITY_SCALE;
-                flowState[base + 3] = coarse.pressure();
+                flowState[base] = stagedSeedVx;
+                flowState[base + 1] = stagedSeedVy;
+                flowState[base + 2] = stagedSeedVz;
+                flowState[base + 3] = stagedSeedPressure;
+            } else {
+                flowState[base] = 0.0f;
+                flowState[base + 1] = 0.0f;
+                flowState[base + 2] = 0.0f;
+                flowState[base + 3] = 0.0f;
             }
             stagedSeedCursor++;
             built++;
+            if ((built & 1023) == 0 && System.nanoTime() >= deadline) {
+                break;
+            }
         }
         return stagedSeedCursor >= CELL_COUNT;
     }
@@ -1080,6 +1156,11 @@ final class ClientL2Solver {
         stagedStaticUploaded = false;
         stagedDynamicUploaded = false;
         stagedStaticFromCache = false;
+        stagedCoarseSeedReady = false;
+        stagedSeedVx = 0.0f;
+        stagedSeedVy = 0.0f;
+        stagedSeedVz = 0.0f;
+        stagedSeedPressure = 0.0f;
     }
 
     private boolean refreshActiveBrickStatic(MinecraftClient client, ClientWorld world) {
@@ -1230,6 +1311,7 @@ final class ClientL2Solver {
         boundaryRefreshBrickZ = brickZ;
         boundaryRefreshCursor = 0;
         boundaryRefreshMaxCoarseSpeed = 0.0f;
+        java.util.Arrays.fill(flowState, 0.0f);
         java.util.Arrays.fill(airTemperature, 0.0f);
         java.util.Arrays.fill(surfaceTemperature, 0.0f);
     }
@@ -1238,6 +1320,7 @@ final class ClientL2Solver {
         if (boundaryRefreshOrigin == null) {
             return BoundaryReferenceBuildResult.WAITING_FOR_COARSE;
         }
+        long deadline = System.nanoTime() + BOUNDARY_REFERENCE_NANOS_PER_TICK;
         int built = 0;
         while (boundaryRefreshCursor < CELL_COUNT && built < BOUNDARY_REFERENCE_CELLS_PER_TICK) {
             int cell = boundaryRefreshCursor;
@@ -1246,7 +1329,7 @@ final class ClientL2Solver {
             int y = rem / BRICK_SIZE;
             int z = rem - y * BRICK_SIZE;
             int base = cell * FLOW_CHANNELS;
-            if (obstacle[cell] == 0) {
+            if (obstacle[cell] == 0 && isBoundaryReferenceCell(x, y, z)) {
                 Vec3d pos = new Vec3d(
                     boundaryRefreshOrigin.getX() + x + 0.5,
                     boundaryRefreshOrigin.getY() + y + 0.5,
@@ -1272,10 +1355,23 @@ final class ClientL2Solver {
             }
             boundaryRefreshCursor++;
             built++;
+            if ((built & 255) == 0 && System.nanoTime() >= deadline) {
+                break;
+            }
         }
         return boundaryRefreshCursor >= CELL_COUNT
             ? BoundaryReferenceBuildResult.COMPLETED
             : BoundaryReferenceBuildResult.IN_PROGRESS;
+    }
+
+    private boolean isBoundaryReferenceCell(int x, int y, int z) {
+        int layers = Math.min(8, BRICK_SIZE);
+        return x < layers
+            || y < layers
+            || z < layers
+            || x >= BRICK_SIZE - layers
+            || y >= BRICK_SIZE - layers
+            || z >= BRICK_SIZE - layers;
     }
 
     private void cancelBoundaryReferenceRefresh() {
@@ -1685,13 +1781,39 @@ final class ClientL2Solver {
     private void populateStaticCell(ClientWorld world, BlockPos origin, int x, int y, int z) {
         staticCursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
         int cell = cellIndex(x, y, z);
-        StaticCellSample sample = sampleStaticCell(world, staticCursor);
+        StaticCellSample sample = sampleStaticSourceCell(world, staticCursor);
         obstacle[cell] = sample.solid() ? (byte) 1 : (byte) 0;
         surfaceKind[cell] = sample.surfaceKind();
         openFaceMask[cell] = sample.openFaceMask();
         emitterPower[cell] = sample.emitterPowerWatts();
         sourceFanDirection[cell] = sample.sourceFanDirection();
         sourceEmitterPower[cell] = sample.sourceEmitterPowerWatts();
+    }
+
+    private StaticCellSample sampleStaticSourceCell(ClientWorld world, BlockPos pos) {
+        BlockState state = world.getBlockState(pos);
+        boolean solid = isSolidObstacle(world, pos, state);
+        short mask = 0;
+        if (!solid) {
+            for (Direction direction : Direction.values()) {
+                staticNeighbor.set(
+                    pos.getX() + direction.getOffsetX(),
+                    pos.getY() + direction.getOffsetY(),
+                    pos.getZ() + direction.getOffsetZ()
+                );
+                if (!isSolidObstacle(world, staticNeighbor, world.getBlockState(staticNeighbor))) {
+                    mask = (short) (mask | (1 << direction.ordinal()));
+                }
+            }
+        }
+        return new StaticCellSample(
+            solid,
+            (byte) 0,
+            mask,
+            0.0f,
+            (byte) sourceFanDirectionCodeForState(state),
+            sourceEmitterPowerForState(state)
+        );
     }
 
     private StaticCellSample sampleStaticCell(ClientWorld world, BlockPos pos) {
@@ -2650,9 +2772,9 @@ final class ClientL2Solver {
             + " publishInterval=" + LOCAL_PUBLISH_INTERVAL_TICKS
             + " publishStride=" + LOCAL_PUBLISH_SAMPLE_STRIDE
             + " maxActive=" + MAX_CLIENT_ACTIVE_BRICKS
-            + " prepBudget=" + STATIC_BUILD_CELLS_PER_TICK
-            + " seedBudget=" + COARSE_SEED_CELLS_PER_TICK
-            + " boundaryBudget=" + BOUNDARY_REFERENCE_CELLS_PER_TICK
+            + " prepBudget=" + STATIC_BUILD_CELLS_PER_TICK + "/" + (STATIC_BUILD_NANOS_PER_TICK / 1000L) + "us"
+            + " seedBudget=" + COARSE_SEED_CELLS_PER_TICK + "/" + (COARSE_SEED_NANOS_PER_TICK / 1000L) + "us"
+            + " boundaryBudget=" + BOUNDARY_REFERENCE_CELLS_PER_TICK + "/" + (BOUNDARY_REFERENCE_NANOS_PER_TICK / 1000L) + "us"
             + " prep=" + stagedPreparationStatus()
             + " boundaryPrep=" + boundaryReferenceRefreshStatus()
             + " fastSuspendUntil=" + fastSuspendUntilGameTime
@@ -2735,6 +2857,7 @@ final class ClientL2Solver {
         fastSuspendUntilGameTime = Long.MIN_VALUE;
         resetActiveBrick();
         if (!enabled) {
+            staticBrickCache.clear();
             worker.reset();
         }
         LOGGER.info("Client L2 local solve {}", enabled ? "enabled" : "disabled");
