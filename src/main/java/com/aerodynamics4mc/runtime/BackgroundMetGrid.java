@@ -1,14 +1,14 @@
 package com.aerodynamics4mc.runtime;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.Level;
+
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.World;
 
 final class BackgroundMetGrid {
     private static final float BASE_AIR_TEMPERATURE_K = 288.15f;
@@ -49,7 +49,7 @@ final class BackgroundMetGrid {
     private final int updateIntervalTicks;
     private final Map<Long, CellState> cells = new HashMap<>();
     private volatile ReadState readState = ReadState.EMPTY;
-    private ServerWorld currentWorld;
+    private ServerLevel currentWorld;
     private SeedTerrainProvider currentProvider;
     private WorldScaleDriver currentDriver;
     private int centerCellX;
@@ -69,13 +69,13 @@ final class BackgroundMetGrid {
     }
 
     synchronized void refresh(
-        ServerWorld world,
-        AeroServerRuntime.WorldEnvironmentSnapshot environmentSnapshot,
-        BlockPos focus,
-        long tickCounter,
-        float dtSeconds,
-        SeedTerrainProvider provider,
-        WorldScaleDriver driver
+            ServerLevel world,
+            AeroServerRuntime.WorldEnvironmentSnapshot environmentSnapshot,
+            BlockPos focus,
+            long tickCounter,
+            float dtSeconds,
+            SeedTerrainProvider provider,
+            WorldScaleDriver driver
     ) {
         currentWorld = world;
         currentProvider = provider;
@@ -88,8 +88,8 @@ final class BackgroundMetGrid {
         boolean updateDue = lastRefreshTick == Long.MIN_VALUE || tickCounter - lastRefreshTick >= updateIntervalTicks;
         if (updateDue) {
             currentDeltaSeconds = lastRefreshTick == Long.MIN_VALUE
-                ? dtSeconds
-                : Math.max(1L, tickCounter - lastRefreshTick) * dtSeconds;
+                    ? dtSeconds
+                    : Math.max(1L, tickCounter - lastRefreshTick) * dtSeconds;
             lastRefreshTick = tickCounter;
             currentRefreshTick = tickCounter;
         } else {
@@ -97,14 +97,14 @@ final class BackgroundMetGrid {
             currentRefreshTick = lastRefreshTick;
         }
 
-        long timeOfDay = environmentSnapshot == null ? world.getTimeOfDay() : environmentSnapshot.timeOfDay();
-        float rainGradient = environmentSnapshot == null ? world.getRainGradient(1.0f) : environmentSnapshot.rainGradient();
-        float thunderGradient = environmentSnapshot == null ? world.getThunderGradient(1.0f) : environmentSnapshot.thunderGradient();
+        long timeOfDay = environmentSnapshot == null ? world.getDayTime() : environmentSnapshot.timeOfDay();
+        float rainGradient = environmentSnapshot == null ? world.getRainLevel(1.0f) : environmentSnapshot.rainGradient();
+        float thunderGradient = environmentSnapshot == null ? world.getThunderLevel(1.0f) : environmentSnapshot.thunderGradient();
         currentRainGradient = rainGradient;
         currentThunderGradient = thunderGradient;
         float dayPhase = (float) Math.floorMod(timeOfDay, 24000L) / 24000.0f;
         currentSolarAltitude = Math.max(0.0f, (float) Math.sin(dayPhase * (float) (Math.PI * 2.0)));
-        currentClearSky = MathHelper.clamp(1.0f - 0.65f * rainGradient - 0.25f * thunderGradient, 0.15f, 1.0f);
+        currentClearSky = Mth.clamp(1.0f - 0.65f * rainGradient - 0.25f * thunderGradient, 0.15f, 1.0f);
 
         if (updateDue || centerChanged || readState.empty()) {
             ensureActiveCells();
@@ -208,38 +208,38 @@ final class BackgroundMetGrid {
         }
 
         readState = new ReadState(
-            gridWidth,
-            cellSizeBlocks,
-            radiusCells,
-            centerCellX,
-            centerCellZ,
-            presentCount,
-            cellPresent,
-            terrainHeightBlocks,
-            biomeTemperature,
-            ambientAirTemperatureKelvin,
-            deepGroundTemperatureKelvin,
-            surfaceTemperatureKelvin,
-            roughnessLengthMeters,
-            pressureAnomalyPa,
-            pressureGradientXPaPerMeter,
-            pressureGradientZPaPerMeter,
-            geostrophicWindX,
-            geostrophicWindZ,
-            backgroundWindX,
-            backgroundWindZ,
-            humidity,
-            convectiveHeatingKelvin,
-            convectiveMoistening,
-            convectiveInflowX,
-            convectiveInflowZ,
-            convectiveEnvelope,
-            tornadoWindX,
-            tornadoWindZ,
-            tornadoHeatingKelvin,
-            tornadoMoistening,
-            tornadoUpdraftProxy,
-            surfaceClass
+                gridWidth,
+                cellSizeBlocks,
+                radiusCells,
+                centerCellX,
+                centerCellZ,
+                presentCount,
+                cellPresent,
+                terrainHeightBlocks,
+                biomeTemperature,
+                ambientAirTemperatureKelvin,
+                deepGroundTemperatureKelvin,
+                surfaceTemperatureKelvin,
+                roughnessLengthMeters,
+                pressureAnomalyPa,
+                pressureGradientXPaPerMeter,
+                pressureGradientZPaPerMeter,
+                geostrophicWindX,
+                geostrophicWindZ,
+                backgroundWindX,
+                backgroundWindZ,
+                humidity,
+                convectiveHeatingKelvin,
+                convectiveMoistening,
+                convectiveInflowX,
+                convectiveInflowZ,
+                convectiveEnvelope,
+                tornadoWindX,
+                tornadoWindZ,
+                tornadoHeatingKelvin,
+                tornadoMoistening,
+                tornadoUpdraftProxy,
+                surfaceClass
         );
     }
 
@@ -268,36 +268,36 @@ final class BackgroundMetGrid {
         float geostrophicWindX = finiteOrDefault(state.geostrophicWindX, backgroundWindX);
         float geostrophicWindZ = finiteOrDefault(state.geostrophicWindZ, backgroundWindZ);
         return new Sample(
-            state.terrainHeightBlocks,
-            state.biomeTemperature,
-            finiteOrDefault(state.ambientAirTemperatureKelvin, target.targetAmbientAirTemperatureKelvin),
-            finiteOrDefault(state.deepGroundTemperatureKelvin, target.targetAmbientAirTemperatureKelvin + DEEP_GROUND_OFFSET_K),
-            finiteOrDefault(
-                state.surfaceTemperatureKelvin,
-                target.targetAmbientAirTemperatureKelvin
-                    + currentSolarAltitude * currentClearSky * SOLAR_SURFACE_HEATING_K
-                    - (1.0f - currentSolarAltitude) * currentClearSky * CLEAR_SKY_COOLING_K
-            ),
-            state.roughnessLengthMeters,
-            finiteClamp(state.pressureAnomalyPa, -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA, target.targetPressureAnomalyPa),
-            finiteOrDefault(state.pressureGradientXPaPerMeter, 0.0f),
-            finiteOrDefault(state.pressureGradientZPaPerMeter, 0.0f),
-            geostrophicWindX,
-            geostrophicWindZ,
-            backgroundWindX,
-            backgroundWindZ,
-            finiteClamp(state.humidity, 0.0f, 1.0f, target.targetHumidity),
-            finiteOrDefault(state.convectiveHeatingKelvin, target.convectiveHeatingKelvin),
-            finiteOrDefault(state.convectiveMoistening, target.convectiveMoistening),
-            finiteOrDefault(state.convectiveInflowX, target.convectiveInflowX),
-            finiteOrDefault(state.convectiveInflowZ, target.convectiveInflowZ),
-            Math.max(0.0f, finiteOrDefault(state.convectiveEnvelope, target.convectiveEnvelope)),
-            finiteOrDefault(state.tornadoWindX, target.tornadoWindX),
-            finiteOrDefault(state.tornadoWindZ, target.tornadoWindZ),
-            finiteOrDefault(state.tornadoHeatingKelvin, target.tornadoHeatingKelvin),
-            finiteOrDefault(state.tornadoMoistening, target.tornadoMoistening),
-            Math.max(0.0f, finiteOrDefault(state.tornadoUpdraftProxy, target.tornadoUpdraftProxy)),
-            state.surfaceClass
+                state.terrainHeightBlocks,
+                state.biomeTemperature,
+                finiteOrDefault(state.ambientAirTemperatureKelvin, target.targetAmbientAirTemperatureKelvin),
+                finiteOrDefault(state.deepGroundTemperatureKelvin, target.targetAmbientAirTemperatureKelvin + DEEP_GROUND_OFFSET_K),
+                finiteOrDefault(
+                        state.surfaceTemperatureKelvin,
+                        target.targetAmbientAirTemperatureKelvin
+                                + currentSolarAltitude * currentClearSky * SOLAR_SURFACE_HEATING_K
+                                - (1.0f - currentSolarAltitude) * currentClearSky * CLEAR_SKY_COOLING_K
+                ),
+                state.roughnessLengthMeters,
+                finiteClamp(state.pressureAnomalyPa, -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA, target.targetPressureAnomalyPa),
+                finiteOrDefault(state.pressureGradientXPaPerMeter, 0.0f),
+                finiteOrDefault(state.pressureGradientZPaPerMeter, 0.0f),
+                geostrophicWindX,
+                geostrophicWindZ,
+                backgroundWindX,
+                backgroundWindZ,
+                finiteClamp(state.humidity, 0.0f, 1.0f, target.targetHumidity),
+                finiteOrDefault(state.convectiveHeatingKelvin, target.convectiveHeatingKelvin),
+                finiteOrDefault(state.convectiveMoistening, target.convectiveMoistening),
+                finiteOrDefault(state.convectiveInflowX, target.convectiveInflowX),
+                finiteOrDefault(state.convectiveInflowZ, target.convectiveInflowZ),
+                Math.max(0.0f, finiteOrDefault(state.convectiveEnvelope, target.convectiveEnvelope)),
+                finiteOrDefault(state.tornadoWindX, target.tornadoWindX),
+                finiteOrDefault(state.tornadoWindZ, target.tornadoWindZ),
+                finiteOrDefault(state.tornadoHeatingKelvin, target.tornadoHeatingKelvin),
+                finiteOrDefault(state.tornadoMoistening, target.tornadoMoistening),
+                Math.max(0.0f, finiteOrDefault(state.tornadoUpdraftProxy, target.tornadoUpdraftProxy)),
+                state.surfaceClass
         );
     }
 
@@ -355,60 +355,60 @@ final class BackgroundMetGrid {
         }
 
         populateDiagnostics(
-            gridWidth,
-            cellSizeBlocks,
-            ambientAirTemperatureKelvin,
-            windX,
-            windZ,
-            vorticity,
-            divergence,
-            temperatureAnomaly
+                gridWidth,
+                cellSizeBlocks,
+                ambientAirTemperatureKelvin,
+                windX,
+                windZ,
+                vorticity,
+                divergence,
+                temperatureAnomaly
         );
 
         WorldScaleDriver.Snapshot driverSnapshot = currentDriver == null ? null : currentDriver.snapshot();
         return new Snapshot(
-            gridWidth,
-            cellSizeBlocks,
-            radiusCells,
-            centerCellX,
-            centerCellZ,
-            currentRefreshTick,
-            currentDeltaSeconds,
-            currentSolarAltitude,
-            currentClearSky,
-            currentRainGradient,
-            currentThunderGradient,
-            driverSnapshot,
-            terrainHeightBlocks,
-            biomeTemperature,
-            roughnessLengthMeters,
-            surfaceClass,
-            ambientAirTemperatureKelvin,
-            deepGroundTemperatureKelvin,
-            surfaceTemperatureKelvin,
-            pressureAnomalyPa,
-            pressureGradientXPaPerMeter,
-            pressureGradientZPaPerMeter,
-            geostrophicWindX,
-            geostrophicWindZ,
-            windX,
-            windZ,
-            humidity,
-            vorticity,
-            divergence,
-            temperatureAnomaly
+                gridWidth,
+                cellSizeBlocks,
+                radiusCells,
+                centerCellX,
+                centerCellZ,
+                currentRefreshTick,
+                currentDeltaSeconds,
+                currentSolarAltitude,
+                currentClearSky,
+                currentRainGradient,
+                currentThunderGradient,
+                driverSnapshot,
+                terrainHeightBlocks,
+                biomeTemperature,
+                roughnessLengthMeters,
+                surfaceClass,
+                ambientAirTemperatureKelvin,
+                deepGroundTemperatureKelvin,
+                surfaceTemperatureKelvin,
+                pressureAnomalyPa,
+                pressureGradientXPaPerMeter,
+                pressureGradientZPaPerMeter,
+                geostrophicWindX,
+                geostrophicWindZ,
+                windX,
+                windZ,
+                humidity,
+                vorticity,
+                divergence,
+                temperatureAnomaly
         );
     }
 
     private void populateDiagnostics(
-        int gridWidth,
-        int cellSizeBlocks,
-        float[] ambientAirTemperatureKelvin,
-        float[] windX,
-        float[] windZ,
-        float[] vorticity,
-        float[] divergence,
-        float[] temperatureAnomaly
+            int gridWidth,
+            int cellSizeBlocks,
+            float[] ambientAirTemperatureKelvin,
+            float[] windX,
+            float[] windZ,
+            float[] vorticity,
+            float[] divergence,
+            float[] temperatureAnomaly
     ) {
         float meanAmbient = 0.0f;
         for (float value : ambientAirTemperatureKelvin) {
@@ -437,8 +437,8 @@ final class BackgroundMetGrid {
         }
     }
 
-    RegistryKey<World> worldKey(ServerWorld world) {
-        return world.getRegistryKey();
+    ResourceKey<Level> worldKey(ServerLevel world) {
+        return world.dimension();
     }
 
     private int cellCenterBlock(int cell) {
@@ -482,11 +482,11 @@ final class BackgroundMetGrid {
             int stateCellZ = unpackZ(entry.getKey());
             WorldScaleTarget target = targetState(state, stateCellX, stateCellZ);
             previous.put(entry.getKey(), new StateSample(
-                finiteOrDefault(state.backgroundWindX, target.targetWindX),
-                finiteOrDefault(state.backgroundWindZ, target.targetWindZ),
-                finiteClamp(state.pressureAnomalyPa, -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA, target.targetPressureAnomalyPa),
-                finiteOrDefault(state.ambientAirTemperatureKelvin, target.targetAmbientAirTemperatureKelvin),
-                finiteClamp(state.humidity, 0.0f, 1.0f, target.targetHumidity)
+                    finiteOrDefault(state.backgroundWindX, target.targetWindX),
+                    finiteOrDefault(state.backgroundWindZ, target.targetWindZ),
+                    finiteClamp(state.pressureAnomalyPa, -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA, target.targetPressureAnomalyPa),
+                    finiteOrDefault(state.ambientAirTemperatureKelvin, target.targetAmbientAirTemperatureKelvin),
+                    finiteClamp(state.humidity, 0.0f, 1.0f, target.targetHumidity)
             ));
         }
         for (int cx = centerCellX - radiusCells; cx <= centerCellX + radiusCells; cx++) {
@@ -499,60 +499,60 @@ final class BackgroundMetGrid {
                 StateSample advected = sampleState(previous, backtraceX, backtraceZ);
                 StateSample neighborMean = sampleNeighborMean(previous, cx, cz);
 
-                float roughnessDrag = MathHelper.clamp(
-                    currentDeltaSeconds * (BASE_ROUGHNESS_DRAG_PER_SECOND + cell.roughnessLengthMeters * ROUGHNESS_DRAG_SCALE_PER_SECOND),
-                    0.0f,
-                    MAX_ROUGHNESS_DRAG
+                float roughnessDrag = Mth.clamp(
+                        currentDeltaSeconds * (BASE_ROUGHNESS_DRAG_PER_SECOND + cell.roughnessLengthMeters * ROUGHNESS_DRAG_SCALE_PER_SECOND),
+                        0.0f,
+                        MAX_ROUGHNESS_DRAG
                 );
                 float nextWindX = mix(advected.windX, neighborMean.windX, FLOW_DIFFUSION_BLEND);
                 float nextWindZ = mix(advected.windZ, neighborMean.windZ, FLOW_DIFFUSION_BLEND);
                 float nextPressure = mix(advected.pressureAnomalyPa, neighborMean.pressureAnomalyPa, PRESSURE_DIFFUSION_BLEND);
                 nextPressure = relax(
-                    nextPressure,
-                    target.targetPressureAnomalyPa,
-                    currentDeltaSeconds,
-                    PRESSURE_RELAXATION_PER_SECOND
+                        nextPressure,
+                        target.targetPressureAnomalyPa,
+                        currentDeltaSeconds,
+                        PRESSURE_RELAXATION_PER_SECOND
                 );
-                nextPressure = MathHelper.clamp(nextPressure, -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA);
+                nextPressure = Mth.clamp(nextPressure, -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA);
                 PressureWind pressureWind = geostrophicWindFromPressure(previous, cx, cz);
                 float directWindBlend = directWindBlendForPressureWind(pressureWind);
-                float targetWindX = MathHelper.lerp(directWindBlend, pressureWind.windX(), target.targetWindX);
-                float targetWindZ = MathHelper.lerp(directWindBlend, pressureWind.windZ(), target.targetWindZ);
+                float targetWindX = Mth.lerp(directWindBlend, pressureWind.windX(), target.targetWindX);
+                float targetWindZ = Mth.lerp(directWindBlend, pressureWind.windZ(), target.targetWindZ);
                 WindVector terrainAdjustedWind = applyTerrainFormDrag(cx, cz, targetWindX, targetWindZ);
                 nextWindX = relax(nextWindX, terrainAdjustedWind.windX(), currentDeltaSeconds, FLOW_RELAXATION_PER_SECOND);
                 nextWindZ = relax(nextWindZ, terrainAdjustedWind.windZ(), currentDeltaSeconds, FLOW_RELAXATION_PER_SECOND);
                 nextWindX *= (1.0f - roughnessDrag);
                 nextWindZ *= (1.0f - roughnessDrag);
-                nextWindX = MathHelper.clamp(nextWindX, -MAX_DYNAMIC_WIND_MPS, MAX_DYNAMIC_WIND_MPS);
-                nextWindZ = MathHelper.clamp(nextWindZ, -MAX_DYNAMIC_WIND_MPS, MAX_DYNAMIC_WIND_MPS);
+                nextWindX = Mth.clamp(nextWindX, -MAX_DYNAMIC_WIND_MPS, MAX_DYNAMIC_WIND_MPS);
+                nextWindZ = Mth.clamp(nextWindZ, -MAX_DYNAMIC_WIND_MPS, MAX_DYNAMIC_WIND_MPS);
 
                 float nextAmbient = mix(advected.ambientAirTemperatureKelvin, neighborMean.ambientAirTemperatureKelvin, THERMAL_DIFFUSION_BLEND);
                 nextAmbient = relax(nextAmbient, target.targetAmbientAirTemperatureKelvin, currentDeltaSeconds, AIR_TEMPERATURE_RELAXATION_PER_SECOND);
 
                 float nextHumidity = mix(advected.humidity, neighborMean.humidity, HUMIDITY_DIFFUSION_BLEND);
                 float evaporationBoost = Math.max(0.0f, cell.surfaceTemperatureKelvin - nextAmbient) * EVAPORATION_SURFACE_DELTA_SCALE;
-                float humidityTarget = MathHelper.clamp(
-                    target.targetHumidity + evaporationBoost + currentRainGradient * 0.05f,
-                    0.0f,
-                    1.0f
+                float humidityTarget = Mth.clamp(
+                        target.targetHumidity + evaporationBoost + currentRainGradient * 0.05f,
+                        0.0f,
+                        1.0f
                 );
-                nextHumidity = MathHelper.clamp(
-                    relax(nextHumidity, humidityTarget, currentDeltaSeconds, HUMIDITY_RELAXATION_PER_SECOND),
-                    0.0f,
-                    1.0f
+                nextHumidity = Mth.clamp(
+                        relax(nextHumidity, humidityTarget, currentDeltaSeconds, HUMIDITY_RELAXATION_PER_SECOND),
+                        0.0f,
+                        1.0f
                 );
 
                 float targetSurfaceTemperatureKelvin = nextAmbient
-                    + currentSolarAltitude * currentClearSky * SOLAR_SURFACE_HEATING_K
-                    - (1.0f - currentSolarAltitude) * currentClearSky * CLEAR_SKY_COOLING_K
-                    - nextHumidity * 2.0f
-                    - currentRainGradient * 3.0f;
+                        + currentSolarAltitude * currentClearSky * SOLAR_SURFACE_HEATING_K
+                        - (1.0f - currentSolarAltitude) * currentClearSky * CLEAR_SKY_COOLING_K
+                        - nextHumidity * 2.0f
+                        - currentRainGradient * 3.0f;
                 cell.ambientAirTemperatureKelvin = finiteOrDefault(nextAmbient, target.targetAmbientAirTemperatureKelvin);
                 cell.deepGroundTemperatureKelvin = relax(
-                    cell.deepGroundTemperatureKelvin,
-                    cell.ambientAirTemperatureKelvin + DEEP_GROUND_OFFSET_K,
-                    currentDeltaSeconds,
-                    DEEP_GROUND_RELAXATION_PER_SECOND
+                        cell.deepGroundTemperatureKelvin,
+                        cell.ambientAirTemperatureKelvin + DEEP_GROUND_OFFSET_K,
+                        currentDeltaSeconds,
+                        DEEP_GROUND_RELAXATION_PER_SECOND
                 );
                 cell.surfaceTemperatureKelvin = relax(cell.surfaceTemperatureKelvin, targetSurfaceTemperatureKelvin, currentDeltaSeconds);
                 cell.pressureAnomalyPa = finiteClamp(nextPressure, -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA, target.targetPressureAnomalyPa);
@@ -588,8 +588,8 @@ final class BackgroundMetGrid {
         }
         if (!Float.isFinite(cell.surfaceTemperatureKelvin) || cell.surfaceTemperatureKelvin <= 0.0f) {
             cell.surfaceTemperatureKelvin = target.targetAmbientAirTemperatureKelvin
-                + currentSolarAltitude * currentClearSky * SOLAR_SURFACE_HEATING_K
-                - (1.0f - currentSolarAltitude) * currentClearSky * CLEAR_SKY_COOLING_K;
+                    + currentSolarAltitude * currentClearSky * SOLAR_SURFACE_HEATING_K
+                    - (1.0f - currentSolarAltitude) * currentClearSky * CLEAR_SKY_COOLING_K;
         }
         if (!Float.isFinite(cell.pressureAnomalyPa)) {
             cell.pressureAnomalyPa = target.targetPressureAnomalyPa;
@@ -623,25 +623,25 @@ final class BackgroundMetGrid {
         StateSample north = sampleState(previous, cellX, cellZ - 1.0f);
         StateSample south = sampleState(previous, cellX, cellZ + 1.0f);
         return new StateSample(
-            (center.windX + west.windX + east.windX + north.windX + south.windX) / 5.0f,
-            (center.windZ + west.windZ + east.windZ + north.windZ + south.windZ) / 5.0f,
-            (center.pressureAnomalyPa
-                + west.pressureAnomalyPa
-                + east.pressureAnomalyPa
-                + north.pressureAnomalyPa
-                + south.pressureAnomalyPa) / 5.0f,
-            (center.ambientAirTemperatureKelvin + west.ambientAirTemperatureKelvin + east.ambientAirTemperatureKelvin + north.ambientAirTemperatureKelvin + south.ambientAirTemperatureKelvin) / 5.0f,
-            MathHelper.clamp(
-                (center.humidity + west.humidity + east.humidity + north.humidity + south.humidity) / 5.0f,
-                0.0f,
-                1.0f
-            )
+                (center.windX + west.windX + east.windX + north.windX + south.windX) / 5.0f,
+                (center.windZ + west.windZ + east.windZ + north.windZ + south.windZ) / 5.0f,
+                (center.pressureAnomalyPa
+                        + west.pressureAnomalyPa
+                        + east.pressureAnomalyPa
+                        + north.pressureAnomalyPa
+                        + south.pressureAnomalyPa) / 5.0f,
+                (center.ambientAirTemperatureKelvin + west.ambientAirTemperatureKelvin + east.ambientAirTemperatureKelvin + north.ambientAirTemperatureKelvin + south.ambientAirTemperatureKelvin) / 5.0f,
+                Mth.clamp(
+                        (center.humidity + west.humidity + east.humidity + north.humidity + south.humidity) / 5.0f,
+                        0.0f,
+                        1.0f
+                )
         );
     }
 
     private StateSample sampleState(Map<Long, StateSample> previous, float cellX, float cellZ) {
-        int x0 = MathHelper.floor(cellX);
-        int z0 = MathHelper.floor(cellZ);
+        int x0 = Mth.floor(cellX);
+        int z0 = Mth.floor(cellZ);
         int x1 = x0 + 1;
         int z1 = z0 + 1;
         float tx = cellX - x0;
@@ -652,22 +652,22 @@ final class BackgroundMetGrid {
         StateSample s01 = stateAt(previous, x0, z1);
         StateSample s11 = stateAt(previous, x1, z1);
 
-        float windX0 = MathHelper.lerp(tx, s00.windX, s10.windX);
-        float windX1 = MathHelper.lerp(tx, s01.windX, s11.windX);
-        float windZ0 = MathHelper.lerp(tx, s00.windZ, s10.windZ);
-        float windZ1 = MathHelper.lerp(tx, s01.windZ, s11.windZ);
-        float pressure0 = MathHelper.lerp(tx, s00.pressureAnomalyPa, s10.pressureAnomalyPa);
-        float pressure1 = MathHelper.lerp(tx, s01.pressureAnomalyPa, s11.pressureAnomalyPa);
-        float temp0 = MathHelper.lerp(tx, s00.ambientAirTemperatureKelvin, s10.ambientAirTemperatureKelvin);
-        float temp1 = MathHelper.lerp(tx, s01.ambientAirTemperatureKelvin, s11.ambientAirTemperatureKelvin);
-        float humidity0 = MathHelper.lerp(tx, s00.humidity, s10.humidity);
-        float humidity1 = MathHelper.lerp(tx, s01.humidity, s11.humidity);
+        float windX0 = Mth.lerp(tx, s00.windX, s10.windX);
+        float windX1 = Mth.lerp(tx, s01.windX, s11.windX);
+        float windZ0 = Mth.lerp(tx, s00.windZ, s10.windZ);
+        float windZ1 = Mth.lerp(tx, s01.windZ, s11.windZ);
+        float pressure0 = Mth.lerp(tx, s00.pressureAnomalyPa, s10.pressureAnomalyPa);
+        float pressure1 = Mth.lerp(tx, s01.pressureAnomalyPa, s11.pressureAnomalyPa);
+        float temp0 = Mth.lerp(tx, s00.ambientAirTemperatureKelvin, s10.ambientAirTemperatureKelvin);
+        float temp1 = Mth.lerp(tx, s01.ambientAirTemperatureKelvin, s11.ambientAirTemperatureKelvin);
+        float humidity0 = Mth.lerp(tx, s00.humidity, s10.humidity);
+        float humidity1 = Mth.lerp(tx, s01.humidity, s11.humidity);
         return new StateSample(
-            MathHelper.lerp(tz, windX0, windX1),
-            MathHelper.lerp(tz, windZ0, windZ1),
-            MathHelper.clamp(MathHelper.lerp(tz, pressure0, pressure1), -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA),
-            MathHelper.lerp(tz, temp0, temp1),
-            MathHelper.clamp(MathHelper.lerp(tz, humidity0, humidity1), 0.0f, 1.0f)
+                Mth.lerp(tz, windX0, windX1),
+                Mth.lerp(tz, windZ0, windZ1),
+                Mth.clamp(Mth.lerp(tz, pressure0, pressure1), -MAX_PRESSURE_ANOMALY_PA, MAX_PRESSURE_ANOMALY_PA),
+                Mth.lerp(tz, temp0, temp1),
+                Mth.clamp(Mth.lerp(tz, humidity0, humidity1), 0.0f, 1.0f)
         );
     }
 
@@ -679,64 +679,64 @@ final class BackgroundMetGrid {
         CellState cell = ensureCell(cellX, cellZ);
         WorldScaleTarget target = targetState(cell, cellX, cellZ);
         return new StateSample(
-            target.targetWindX,
-            target.targetWindZ,
-            target.targetPressureAnomalyPa,
-            target.targetAmbientAirTemperatureKelvin,
-            target.targetHumidity
+                target.targetWindX,
+                target.targetWindZ,
+                target.targetPressureAnomalyPa,
+                target.targetAmbientAirTemperatureKelvin,
+                target.targetHumidity
         );
     }
 
     private WorldScaleTarget targetState(CellState cell, int cellX, int cellZ) {
         float baseAmbient = BASE_AIR_TEMPERATURE_K
-            + (cell.biomeTemperature - 0.8f) * BIOME_TEMPERATURE_SCALE_K
-            - Math.max(0.0f, cell.terrainHeightBlocks - currentWorld.getSeaLevel()) * ALTITUDE_LAPSE_RATE_K_PER_BLOCK;
+                + (cell.biomeTemperature - 0.8f) * BIOME_TEMPERATURE_SCALE_K
+                - Math.max(0.0f, cell.terrainHeightBlocks - currentWorld.getSeaLevel()) * ALTITUDE_LAPSE_RATE_K_PER_BLOCK;
         WorldScaleDriver.Sample driverSample = currentDriver == null ? null : currentDriver.sample(cellX, cellZ);
         float fallbackWindX = prevailingWindComponent(currentWorld.getSeed(), cellX, cellZ, 0x517cc1b727220a95L);
         float fallbackWindZ = prevailingWindComponent(currentWorld.getSeed(), cellX, cellZ, 0x9e3779b97f4a7c15L);
         float targetWindX = finiteClamp(
-            driverSample != null ? driverSample.targetWindX() : fallbackWindX,
-            -MAX_DRIVER_WIND_MPS,
-            MAX_DRIVER_WIND_MPS,
-            fallbackWindX
+                driverSample != null ? driverSample.targetWindX() : fallbackWindX,
+                -MAX_DRIVER_WIND_MPS,
+                MAX_DRIVER_WIND_MPS,
+                fallbackWindX
         );
         float targetWindZ = finiteClamp(
-            driverSample != null ? driverSample.targetWindZ() : fallbackWindZ,
-            -MAX_DRIVER_WIND_MPS,
-            MAX_DRIVER_WIND_MPS,
-            fallbackWindZ
+                driverSample != null ? driverSample.targetWindZ() : fallbackWindZ,
+                -MAX_DRIVER_WIND_MPS,
+                MAX_DRIVER_WIND_MPS,
+                fallbackWindZ
         );
         float targetPressureAnomalyPa = finiteClamp(
-            driverSample != null ? driverSample.pressureAnomalyPa() : 0.0f,
-            -MAX_PRESSURE_ANOMALY_PA,
-            MAX_PRESSURE_ANOMALY_PA,
-            0.0f
+                driverSample != null ? driverSample.pressureAnomalyPa() : 0.0f,
+                -MAX_PRESSURE_ANOMALY_PA,
+                MAX_PRESSURE_ANOMALY_PA,
+                0.0f
         );
         float targetAmbient = finiteOrDefault(baseAmbient + (driverSample == null ? 0.0f : driverSample.temperatureBiasKelvin()), baseAmbient);
         float humidity = finiteClamp(
-            (driverSample == null ? 0.50f : driverSample.humidity())
-                + currentRainGradient * MAX_HUMIDITY_RESPONSE
-                + currentThunderGradient * 0.10f,
-            0.0f,
-            1.0f,
-            0.50f
+                (driverSample == null ? 0.50f : driverSample.humidity())
+                        + currentRainGradient * MAX_HUMIDITY_RESPONSE
+                        + currentThunderGradient * 0.10f,
+                0.0f,
+                1.0f,
+                0.50f
         );
         return new WorldScaleTarget(
-            targetWindX,
-            targetWindZ,
-            targetPressureAnomalyPa,
-            targetAmbient,
-            humidity,
-            finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveHeatingKelvin(), 0.0f),
-            finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveMoistening(), 0.0f),
-            finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveInflowX(), 0.0f),
-            finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveInflowZ(), 0.0f),
-            Math.max(0.0f, finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveEnvelope(), 0.0f)),
-            finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoWindX(), 0.0f),
-            finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoWindZ(), 0.0f),
-            finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoHeatingKelvin(), 0.0f),
-            finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoMoistening(), 0.0f),
-            Math.max(0.0f, finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoUpdraftProxy(), 0.0f))
+                targetWindX,
+                targetWindZ,
+                targetPressureAnomalyPa,
+                targetAmbient,
+                humidity,
+                finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveHeatingKelvin(), 0.0f),
+                finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveMoistening(), 0.0f),
+                finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveInflowX(), 0.0f),
+                finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveInflowZ(), 0.0f),
+                Math.max(0.0f, finiteOrDefault(driverSample == null ? 0.0f : driverSample.convectiveEnvelope(), 0.0f)),
+                finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoWindX(), 0.0f),
+                finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoWindZ(), 0.0f),
+                finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoHeatingKelvin(), 0.0f),
+                finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoMoistening(), 0.0f),
+                Math.max(0.0f, finiteOrDefault(driverSample == null ? 0.0f : driverSample.tornadoUpdraftProxy(), 0.0f))
         );
     }
 
@@ -757,16 +757,16 @@ final class BackgroundMetGrid {
             return new WindVector(windX, windZ);
         }
 
-        float speed = MathHelper.sqrt(speedSquared);
+        float speed = Mth.sqrt(speedSquared);
         float invSpeed = 1.0f / Math.max(1.0e-3f, speed);
-        float invSlope = 1.0f / Math.max(1.0e-3f, MathHelper.sqrt(slopeSquared));
+        float invSlope = 1.0f / Math.max(1.0e-3f, Mth.sqrt(slopeSquared));
         float unitWindX = windX * invSpeed;
         float unitWindZ = windZ * invSpeed;
         float uphillComponent = unitWindX * slopeX + unitWindZ * slopeZ;
-        float uphillDrag = MathHelper.clamp(
-            Math.max(0.0f, uphillComponent) * TERRAIN_FORM_DRAG_SCALE,
-            0.0f,
-            MAX_TERRAIN_WIND_ADJUSTMENT
+        float uphillDrag = Mth.clamp(
+                Math.max(0.0f, uphillComponent) * TERRAIN_FORM_DRAG_SCALE,
+                0.0f,
+                MAX_TERRAIN_WIND_ADJUSTMENT
         );
 
         float adjustedWindX = windX * (1.0f - uphillDrag);
@@ -775,15 +775,15 @@ final class BackgroundMetGrid {
         float contourZ = slopeX * invSlope;
         float contourAlignment = windX * contourX + windZ * contourZ;
         float contourSign = contourAlignment >= 0.0f ? 1.0f : -1.0f;
-        float deflection = MathHelper.clamp(
-            Math.abs(uphillComponent) * TERRAIN_FLOW_DEFLECTION_SCALE,
-            0.0f,
-            MAX_TERRAIN_WIND_ADJUSTMENT
+        float deflection = Mth.clamp(
+                Math.abs(uphillComponent) * TERRAIN_FLOW_DEFLECTION_SCALE,
+                0.0f,
+                MAX_TERRAIN_WIND_ADJUSTMENT
         ) * speed;
         adjustedWindX += contourX * contourSign * deflection;
         adjustedWindZ += contourZ * contourSign * deflection;
 
-        float adjustedSpeed = MathHelper.sqrt(adjustedWindX * adjustedWindX + adjustedWindZ * adjustedWindZ);
+        float adjustedSpeed = Mth.sqrt(adjustedWindX * adjustedWindX + adjustedWindZ * adjustedWindZ);
         float maxAdjustedSpeed = Math.max(0.1f, speed * 1.15f);
         if (adjustedSpeed > maxAdjustedSpeed) {
             float scale = maxAdjustedSpeed / adjustedSpeed;
@@ -791,8 +791,8 @@ final class BackgroundMetGrid {
             adjustedWindZ *= scale;
         }
         return new WindVector(
-            finiteClamp(adjustedWindX, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, windX),
-            finiteClamp(adjustedWindZ, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, windZ)
+                finiteClamp(adjustedWindX, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, windX),
+                finiteClamp(adjustedWindZ, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, windZ)
         );
     }
 
@@ -802,13 +802,13 @@ final class BackgroundMetGrid {
             return existing.terrainHeightBlocks;
         }
         SeedTerrainProvider.TerrainSample terrain = currentProvider.sample(
-            currentWorld,
-            cellCenterBlock(cellX),
-            cellCenterBlock(cellZ)
+                currentWorld,
+                cellCenterBlock(cellX),
+                cellCenterBlock(cellZ)
         );
         return Float.isFinite(terrain.terrainHeightBlocks())
-            ? terrain.terrainHeightBlocks()
-            : currentWorld.getSeaLevel();
+                ? terrain.terrainHeightBlocks()
+                : currentWorld.getSeaLevel();
     }
 
     private PressureWind geostrophicWindFromPressure(Map<Long, StateSample> previous, int cellX, int cellZ) {
@@ -824,10 +824,10 @@ final class BackgroundMetGrid {
         float windX = -gradientZ * GEOSTROPHIC_WIND_SCALE_M2_PER_PA_S * coriolisSign / coriolisStrength;
         float windZ = gradientX * GEOSTROPHIC_WIND_SCALE_M2_PER_PA_S * coriolisSign / coriolisStrength;
         return new PressureWind(
-            gradientX,
-            gradientZ,
-            finiteClamp(windX, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, 0.0f),
-            finiteClamp(windZ, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, 0.0f)
+                gradientX,
+                gradientZ,
+                finiteClamp(windX, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, 0.0f),
+                finiteClamp(windZ, -MAX_DRIVER_WIND_MPS, MAX_DRIVER_WIND_MPS, 0.0f)
         );
     }
 
@@ -836,15 +836,15 @@ final class BackgroundMetGrid {
         if (pressureWindSpeed >= GEOSTROPHIC_FALLBACK_SPEED_MPS) {
             return GEOSTROPHIC_DIRECT_WIND_BLEND;
         }
-        float fallbackWeight = 1.0f - MathHelper.clamp(pressureWindSpeed / GEOSTROPHIC_FALLBACK_SPEED_MPS, 0.0f, 1.0f);
-        return MathHelper.lerp(fallbackWeight, GEOSTROPHIC_DIRECT_WIND_BLEND, GEOSTROPHIC_FALLBACK_WIND_BLEND);
+        float fallbackWeight = 1.0f - Mth.clamp(pressureWindSpeed / GEOSTROPHIC_FALLBACK_SPEED_MPS, 0.0f, 1.0f);
+        return Mth.lerp(fallbackWeight, GEOSTROPHIC_DIRECT_WIND_BLEND, GEOSTROPHIC_FALLBACK_WIND_BLEND);
     }
 
     private float windSpeed(float windX, float windZ) {
         if (!Float.isFinite(windX) || !Float.isFinite(windZ)) {
             return 0.0f;
         }
-        return MathHelper.sqrt(windX * windX + windZ * windZ);
+        return Mth.sqrt(windX * windX + windZ * windZ);
     }
 
     private float pseudoCoriolisFactor(int cellZ) {
@@ -853,7 +853,7 @@ final class BackgroundMetGrid {
         if (wrapped < 0.0f) {
             wrapped += periodCells;
         }
-        return MathHelper.clamp((wrapped - periodCells * 0.5f) / (periodCells * 0.5f), -1.0f, 1.0f);
+        return Mth.clamp((wrapped - periodCells * 0.5f) / (periodCells * 0.5f), -1.0f, 1.0f);
     }
 
     private float relax(float current, float target, float deltaSeconds) {
@@ -861,8 +861,8 @@ final class BackgroundMetGrid {
         if (!Float.isFinite(current) || current <= 0.0f) {
             return safeTarget;
         }
-        float alpha = MathHelper.clamp(deltaSeconds * SURFACE_RELAXATION_PER_SECOND, 0.0f, 1.0f);
-        return MathHelper.lerp(alpha, current, safeTarget);
+        float alpha = Mth.clamp(deltaSeconds * SURFACE_RELAXATION_PER_SECOND, 0.0f, 1.0f);
+        return Mth.lerp(alpha, current, safeTarget);
     }
 
     private float relax(float current, float target, float deltaSeconds, float ratePerSecond) {
@@ -870,12 +870,12 @@ final class BackgroundMetGrid {
         if (!Float.isFinite(current)) {
             return safeTarget;
         }
-        float alpha = MathHelper.clamp(deltaSeconds * ratePerSecond, 0.0f, 1.0f);
-        return MathHelper.lerp(alpha, current, safeTarget);
+        float alpha = Mth.clamp(deltaSeconds * ratePerSecond, 0.0f, 1.0f);
+        return Mth.lerp(alpha, current, safeTarget);
     }
 
     private float mix(float a, float b, float t) {
-        return MathHelper.lerp(MathHelper.clamp(t, 0.0f, 1.0f), a, b);
+        return Mth.lerp(Mth.clamp(t, 0.0f, 1.0f), a, b);
     }
 
     private float finiteOrDefault(float value, float fallback) {
@@ -887,9 +887,9 @@ final class BackgroundMetGrid {
 
     private float finiteClamp(float value, float min, float max, float fallback) {
         if (Float.isFinite(value)) {
-            return MathHelper.clamp(value, min, max);
+            return Mth.clamp(value, min, max);
         }
-        return MathHelper.clamp(finiteOrDefault(fallback, min), min, max);
+        return Mth.clamp(finiteOrDefault(fallback, min), min, max);
     }
 
     private float prevailingWindComponent(long seed, int x, int z, long salt) {
@@ -914,12 +914,12 @@ final class BackgroundMetGrid {
     }
 
     private static int readCellIndex(
-        int cellX,
-        int cellZ,
-        int centerCellX,
-        int centerCellZ,
-        int radiusCells,
-        int gridWidth
+            int cellX,
+            int cellZ,
+            int centerCellX,
+            int centerCellZ,
+            int radiusCells,
+            int gridWidth
     ) {
         int localX = cellX - (centerCellX - radiusCells);
         int localZ = cellZ - (centerCellZ - radiusCells);
@@ -930,72 +930,72 @@ final class BackgroundMetGrid {
     }
 
     private record ReadState(
-        int gridWidth,
-        int cellSizeBlocks,
-        int radiusCells,
-        int centerCellX,
-        int centerCellZ,
-        int presentCount,
-        boolean[] cellPresent,
-        float[] terrainHeightBlocks,
-        float[] biomeTemperature,
-        float[] ambientAirTemperatureKelvin,
-        float[] deepGroundTemperatureKelvin,
-        float[] surfaceTemperatureKelvin,
-        float[] roughnessLengthMeters,
-        float[] pressureAnomalyPa,
-        float[] pressureGradientXPaPerMeter,
-        float[] pressureGradientZPaPerMeter,
-        float[] geostrophicWindX,
-        float[] geostrophicWindZ,
-        float[] backgroundWindX,
-        float[] backgroundWindZ,
-        float[] humidity,
-        float[] convectiveHeatingKelvin,
-        float[] convectiveMoistening,
-        float[] convectiveInflowX,
-        float[] convectiveInflowZ,
-        float[] convectiveEnvelope,
-        float[] tornadoWindX,
-        float[] tornadoWindZ,
-        float[] tornadoHeatingKelvin,
-        float[] tornadoMoistening,
-        float[] tornadoUpdraftProxy,
-        byte[] surfaceClass
+            int gridWidth,
+            int cellSizeBlocks,
+            int radiusCells,
+            int centerCellX,
+            int centerCellZ,
+            int presentCount,
+            boolean[] cellPresent,
+            float[] terrainHeightBlocks,
+            float[] biomeTemperature,
+            float[] ambientAirTemperatureKelvin,
+            float[] deepGroundTemperatureKelvin,
+            float[] surfaceTemperatureKelvin,
+            float[] roughnessLengthMeters,
+            float[] pressureAnomalyPa,
+            float[] pressureGradientXPaPerMeter,
+            float[] pressureGradientZPaPerMeter,
+            float[] geostrophicWindX,
+            float[] geostrophicWindZ,
+            float[] backgroundWindX,
+            float[] backgroundWindZ,
+            float[] humidity,
+            float[] convectiveHeatingKelvin,
+            float[] convectiveMoistening,
+            float[] convectiveInflowX,
+            float[] convectiveInflowZ,
+            float[] convectiveEnvelope,
+            float[] tornadoWindX,
+            float[] tornadoWindZ,
+            float[] tornadoHeatingKelvin,
+            float[] tornadoMoistening,
+            float[] tornadoUpdraftProxy,
+            byte[] surfaceClass
     ) {
         private static final ReadState EMPTY = new ReadState(
-            0,
-            1,
-            0,
-            0,
-            0,
-            0,
-            new boolean[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new float[0],
-            new byte[0]
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                new boolean[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new byte[0]
         );
 
         private boolean empty() {
@@ -1017,95 +1017,95 @@ final class BackgroundMetGrid {
                 return null;
             }
             return new Sample(
-                terrainHeightBlocks[index],
-                biomeTemperature[index],
-                ambientAirTemperatureKelvin[index],
-                deepGroundTemperatureKelvin[index],
-                surfaceTemperatureKelvin[index],
-                roughnessLengthMeters[index],
-                pressureAnomalyPa[index],
-                pressureGradientXPaPerMeter[index],
-                pressureGradientZPaPerMeter[index],
-                geostrophicWindX[index],
-                geostrophicWindZ[index],
-                backgroundWindX[index],
-                backgroundWindZ[index],
-                humidity[index],
-                convectiveHeatingKelvin[index],
-                convectiveMoistening[index],
-                convectiveInflowX[index],
-                convectiveInflowZ[index],
-                convectiveEnvelope[index],
-                tornadoWindX[index],
-                tornadoWindZ[index],
-                tornadoHeatingKelvin[index],
-                tornadoMoistening[index],
-                tornadoUpdraftProxy[index],
-                surfaceClass[index]
+                    terrainHeightBlocks[index],
+                    biomeTemperature[index],
+                    ambientAirTemperatureKelvin[index],
+                    deepGroundTemperatureKelvin[index],
+                    surfaceTemperatureKelvin[index],
+                    roughnessLengthMeters[index],
+                    pressureAnomalyPa[index],
+                    pressureGradientXPaPerMeter[index],
+                    pressureGradientZPaPerMeter[index],
+                    geostrophicWindX[index],
+                    geostrophicWindZ[index],
+                    backgroundWindX[index],
+                    backgroundWindZ[index],
+                    humidity[index],
+                    convectiveHeatingKelvin[index],
+                    convectiveMoistening[index],
+                    convectiveInflowX[index],
+                    convectiveInflowZ[index],
+                    convectiveEnvelope[index],
+                    tornadoWindX[index],
+                    tornadoWindZ[index],
+                    tornadoHeatingKelvin[index],
+                    tornadoMoistening[index],
+                    tornadoUpdraftProxy[index],
+                    surfaceClass[index]
             );
         }
     }
 
     record Sample(
-        float terrainHeightBlocks,
-        float biomeTemperature,
-        float ambientAirTemperatureKelvin,
-        float deepGroundTemperatureKelvin,
-        float surfaceTemperatureKelvin,
-        float roughnessLengthMeters,
-        float pressureAnomalyPa,
-        float pressureGradientXPaPerMeter,
-        float pressureGradientZPaPerMeter,
-        float geostrophicWindX,
-        float geostrophicWindZ,
-        float backgroundWindX,
-        float backgroundWindZ,
-        float humidity,
-        float convectiveHeatingKelvin,
-        float convectiveMoistening,
-        float convectiveInflowX,
-        float convectiveInflowZ,
-        float convectiveEnvelope,
-        float tornadoWindX,
-        float tornadoWindZ,
-        float tornadoHeatingKelvin,
-        float tornadoMoistening,
-        float tornadoUpdraftProxy,
-        byte surfaceClass
+            float terrainHeightBlocks,
+            float biomeTemperature,
+            float ambientAirTemperatureKelvin,
+            float deepGroundTemperatureKelvin,
+            float surfaceTemperatureKelvin,
+            float roughnessLengthMeters,
+            float pressureAnomalyPa,
+            float pressureGradientXPaPerMeter,
+            float pressureGradientZPaPerMeter,
+            float geostrophicWindX,
+            float geostrophicWindZ,
+            float backgroundWindX,
+            float backgroundWindZ,
+            float humidity,
+            float convectiveHeatingKelvin,
+            float convectiveMoistening,
+            float convectiveInflowX,
+            float convectiveInflowZ,
+            float convectiveEnvelope,
+            float tornadoWindX,
+            float tornadoWindZ,
+            float tornadoHeatingKelvin,
+            float tornadoMoistening,
+            float tornadoUpdraftProxy,
+            byte surfaceClass
     ) {
     }
 
     record Snapshot(
-        int gridWidth,
-        int cellSizeBlocks,
-        int radiusCells,
-        int centerCellX,
-        int centerCellZ,
-        long tick,
-        float deltaSeconds,
-        float solarAltitude,
-        float clearSky,
-        float rainGradient,
-        float thunderGradient,
-        WorldScaleDriver.Snapshot driver,
-        float[] terrainHeightBlocks,
-        float[] biomeTemperature,
-        float[] roughnessLengthMeters,
-        byte[] surfaceClass,
-        float[] ambientAirTemperatureKelvin,
-        float[] deepGroundTemperatureKelvin,
-        float[] surfaceTemperatureKelvin,
-        float[] pressureAnomalyPa,
-        float[] pressureGradientXPaPerMeter,
-        float[] pressureGradientZPaPerMeter,
-        float[] geostrophicWindX,
-        float[] geostrophicWindZ,
-        float[] windX,
-        float[] windZ,
-        float[] humidity,
-        float[] vorticity,
-        float[] divergence,
-        float[] temperatureAnomaly
+            int gridWidth,
+            int cellSizeBlocks,
+            int radiusCells,
+            int centerCellX,
+            int centerCellZ,
+            long tick,
+            float deltaSeconds,
+            float solarAltitude,
+            float clearSky,
+            float rainGradient,
+            float thunderGradient,
+            WorldScaleDriver.Snapshot driver,
+            float[] terrainHeightBlocks,
+            float[] biomeTemperature,
+            float[] roughnessLengthMeters,
+            byte[] surfaceClass,
+            float[] ambientAirTemperatureKelvin,
+            float[] deepGroundTemperatureKelvin,
+            float[] surfaceTemperatureKelvin,
+            float[] pressureAnomalyPa,
+            float[] pressureGradientXPaPerMeter,
+            float[] pressureGradientZPaPerMeter,
+            float[] geostrophicWindX,
+            float[] geostrophicWindZ,
+            float[] windX,
+            float[] windZ,
+            float[] humidity,
+            float[] vorticity,
+            float[] divergence,
+            float[] temperatureAnomaly
     ) {
     }
 
@@ -1139,30 +1139,30 @@ final class BackgroundMetGrid {
     }
 
     private record StateSample(
-        float windX,
-        float windZ,
-        float pressureAnomalyPa,
-        float ambientAirTemperatureKelvin,
-        float humidity
+            float windX,
+            float windZ,
+            float pressureAnomalyPa,
+            float ambientAirTemperatureKelvin,
+            float humidity
     ) {
     }
 
     private record WorldScaleTarget(
-        float targetWindX,
-        float targetWindZ,
-        float targetPressureAnomalyPa,
-        float targetAmbientAirTemperatureKelvin,
-        float targetHumidity,
-        float convectiveHeatingKelvin,
-        float convectiveMoistening,
-        float convectiveInflowX,
-        float convectiveInflowZ,
-        float convectiveEnvelope,
-        float tornadoWindX,
-        float tornadoWindZ,
-        float tornadoHeatingKelvin,
-        float tornadoMoistening,
-        float tornadoUpdraftProxy
+            float targetWindX,
+            float targetWindZ,
+            float targetPressureAnomalyPa,
+            float targetAmbientAirTemperatureKelvin,
+            float targetHumidity,
+            float convectiveHeatingKelvin,
+            float convectiveMoistening,
+            float convectiveInflowX,
+            float convectiveInflowZ,
+            float convectiveEnvelope,
+            float tornadoWindX,
+            float tornadoWindZ,
+            float tornadoHeatingKelvin,
+            float tornadoMoistening,
+            float tornadoUpdraftProxy
     ) {
     }
 
@@ -1170,10 +1170,10 @@ final class BackgroundMetGrid {
     }
 
     private record PressureWind(
-        float pressureGradientXPaPerMeter,
-        float pressureGradientZPaPerMeter,
-        float windX,
-        float windZ
+            float pressureGradientXPaPerMeter,
+            float pressureGradientZPaPerMeter,
+            float windX,
+            float windZ
     ) {
     }
 }

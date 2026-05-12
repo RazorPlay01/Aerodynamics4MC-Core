@@ -1,22 +1,18 @@
 package com.aerodynamics4mc.runtime;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.LevelResource;
+
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.WorldSavePath;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
 
 final class StaticStore implements AutoCloseable {
     private static final int MAGIC = 0x41345353;
@@ -31,7 +27,7 @@ final class StaticStore implements AutoCloseable {
 
     boolean loadSection(
         MinecraftServer server,
-        RegistryKey<World> worldKey,
+        ResourceKey<Level> worldKey,
         BlockPos sectionOrigin,
         WorldMirror.SectionSnapshot snapshot
     ) {
@@ -62,7 +58,7 @@ final class StaticStore implements AutoCloseable {
 
     void storeSection(
         MinecraftServer server,
-        RegistryKey<World> worldKey,
+        ResourceKey<Level> worldKey,
         BlockPos sectionOrigin,
         WorldMirror.SectionSnapshot snapshot
     ) {
@@ -73,7 +69,7 @@ final class StaticStore implements AutoCloseable {
         ioExecutor.execute(() -> writeSection(server, worldKey, stored));
     }
 
-    void invalidateSection(MinecraftServer server, RegistryKey<World> worldKey, BlockPos sectionOrigin) {
+    void invalidateSection(MinecraftServer server, ResourceKey<Level> worldKey, BlockPos sectionOrigin) {
         if (closed.get()) {
             return;
         }
@@ -99,7 +95,7 @@ final class StaticStore implements AutoCloseable {
         }
     }
 
-    private void writeSection(MinecraftServer server, RegistryKey<World> worldKey, StoredSection stored) {
+    private void writeSection(MinecraftServer server, ResourceKey<Level> worldKey, StoredSection stored) {
         Path path = sectionFile(server, worldKey, stored.origin());
         try {
             Files.createDirectories(path.getParent());
@@ -119,12 +115,12 @@ final class StaticStore implements AutoCloseable {
         }
     }
 
-    private Path sectionFile(MinecraftServer server, RegistryKey<World> worldKey, BlockPos sectionOrigin) {
-        Path root = server.getSavePath(WorldSavePath.ROOT)
+    private Path sectionFile(MinecraftServer server, ResourceKey<Level> worldKey, BlockPos sectionOrigin) {
+        Path root = server.getWorldPath(LevelResource.ROOT)
             .resolve("aerodynamics4mc")
             .resolve("static_store_v1");
-        String namespace = worldKey.getValue().getNamespace();
-        String path = worldKey.getValue().getPath().replace('/', '_');
+        String namespace = worldKey.identifier().getNamespace();
+        String path = worldKey.identifier().getPath().replace('/', '_');
         return root
             .resolve(namespace)
             .resolve(path)

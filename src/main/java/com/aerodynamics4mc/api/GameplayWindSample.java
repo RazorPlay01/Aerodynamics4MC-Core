@@ -1,6 +1,6 @@
 package com.aerodynamics4mc.api;
 
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.Vec3;
 
 public record GameplayWindSample(
     float meanX,
@@ -165,16 +165,16 @@ public record GameplayWindSample(
         );
     }
 
-    public Vec3d meanVelocity() {
-        return new Vec3d(meanX, meanY, meanZ);
+    public Vec3 meanVelocity() {
+        return new Vec3(meanX, meanY, meanZ);
     }
 
-    public Vec3d gustVelocity() {
-        return new Vec3d(gustX, gustY, gustZ);
+    public Vec3 gustVelocity() {
+        return new Vec3(gustX, gustY, gustZ);
     }
 
-    public Vec3d effectiveVelocity() {
-        return new Vec3d(meanX + gustX, meanY + gustY, meanZ + gustZ);
+    public Vec3 effectiveVelocity() {
+        return new Vec3(meanX + gustX, meanY + gustY, meanZ + gustZ);
     }
 
     public float meanSpeedMetersPerSecond() {

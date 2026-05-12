@@ -2,58 +2,57 @@ package com.aerodynamics4mc.client;
 
 import com.aerodynamics4mc.api.AeroClientWindApi;
 import com.aerodynamics4mc.api.SamplePolicy;
-
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 public final class ParticleWindController {
     private static final double MIN_WIND_SPEED = 0.01;
 
     private ParticleWindController() {}
 
-    public static Vec3d applyLeaves(ClientWorld world, double x, double y, double z, Vec3d velocity) {
-        Vec3d wind = sampleWind(world, x, y, z);
-        if (wind.lengthSquared() < MIN_WIND_SPEED * MIN_WIND_SPEED) {
+    public static Vec3 applyLeaves(ClientLevel world, double x, double y, double z, Vec3 velocity) {
+        Vec3 wind = sampleWind(world, x, y, z);
+        if (wind.lengthSqr() < MIN_WIND_SPEED * MIN_WIND_SPEED) {
             return velocity;
         }
         return applyHorizontalResponse(velocity, wind, 0.060, 0.21);
     }
 
-    public static Vec3d applyCampfireSmoke(ClientWorld world, double x, double y, double z, Vec3d velocity) {
-        Vec3d wind = sampleWind(world, x, y + 0.6, z);
-        if (wind.lengthSquared() < MIN_WIND_SPEED * MIN_WIND_SPEED) {
+    public static Vec3 applyCampfireSmoke(ClientLevel world, double x, double y, double z, Vec3 velocity) {
+        Vec3 wind = sampleWind(world, x, y + 0.6, z);
+        if (wind.lengthSqr() < MIN_WIND_SPEED * MIN_WIND_SPEED) {
             return velocity;
         }
-        Vec3d next = applyHorizontalResponse(velocity, wind, 0.035, 0.18);
+        Vec3 next = applyHorizontalResponse(velocity, wind, 0.035, 0.18);
         double updraft = Math.max(0.0, wind.y) * 0.015;
-        return new Vec3d(next.x, Math.min(next.y + updraft, 0.28), next.z);
+        return new Vec3(next.x, Math.min(next.y + updraft, 0.28), next.z);
     }
 
-    public static Vec3d applyTorchSmoke(ClientWorld world, double x, double y, double z, Vec3d velocity) {
-        Vec3d wind = sampleWind(world, x, y + 0.25, z);
-        if (wind.lengthSquared() < MIN_WIND_SPEED * MIN_WIND_SPEED) {
+    public static Vec3 applyTorchSmoke(ClientLevel world, double x, double y, double z, Vec3 velocity) {
+        Vec3 wind = sampleWind(world, x, y + 0.25, z);
+        if (wind.lengthSqr() < MIN_WIND_SPEED * MIN_WIND_SPEED) {
             return velocity;
         }
-        Vec3d next = applyHorizontalResponse(velocity, wind, 0.024, 0.10);
-        return new Vec3d(next.x, next.y + Math.max(0.0, wind.y) * 0.006, next.z);
+        Vec3 next = applyHorizontalResponse(velocity, wind, 0.024, 0.10);
+        return new Vec3(next.x, next.y + Math.max(0.0, wind.y) * 0.006, next.z);
     }
 
-    public static Vec3d applyTorchFlame(ClientWorld world, double x, double y, double z, Vec3d velocity) {
-        Vec3d wind = sampleWind(world, x, y + 0.12, z);
-        if (wind.lengthSquared() < MIN_WIND_SPEED * MIN_WIND_SPEED) {
+    public static Vec3 applyTorchFlame(ClientLevel world, double x, double y, double z, Vec3 velocity) {
+        Vec3 wind = sampleWind(world, x, y + 0.12, z);
+        if (wind.lengthSqr() < MIN_WIND_SPEED * MIN_WIND_SPEED) {
             return velocity;
         }
-        Vec3d next = applyHorizontalResponse(velocity, wind, 0.012, 0.050);
-        double vertical = MathHelper.clamp(velocity.y + wind.y * 0.003, -0.02, 0.12);
-        return new Vec3d(next.x, vertical, next.z);
+        Vec3 next = applyHorizontalResponse(velocity, wind, 0.012, 0.050);
+        double vertical = Mth.clamp(velocity.y + wind.y * 0.003, -0.02, 0.12);
+        return new Vec3(next.x, vertical, next.z);
     }
 
-    private static Vec3d sampleWind(ClientWorld world, double x, double y, double z) {
-        return AeroClientWindApi.sample(world, new Vec3d(x, y, z), SamplePolicy.CLIENT_LOCAL_PREFERRED).effectiveVelocity();
+    private static Vec3 sampleWind(ClientLevel world, double x, double y, double z) {
+        return AeroClientWindApi.sample(world, new Vec3(x, y, z), SamplePolicy.CLIENT_LOCAL_PREFERRED).effectiveVelocity();
     }
 
-    private static Vec3d applyHorizontalResponse(Vec3d velocity, Vec3d wind, double response, double maxHorizontalSpeed) {
+    private static Vec3 applyHorizontalResponse(Vec3 velocity, Vec3 wind, double response, double maxHorizontalSpeed) {
         double nextX = velocity.x + wind.x * response;
         double nextZ = velocity.z + wind.z * response;
         double horizontalSpeed = Math.sqrt(nextX * nextX + nextZ * nextZ);
@@ -62,6 +61,6 @@ public final class ParticleWindController {
             nextX *= scale;
             nextZ *= scale;
         }
-        return new Vec3d(nextX, velocity.y, nextZ);
+        return new Vec3(nextX, velocity.y, nextZ);
     }
 }

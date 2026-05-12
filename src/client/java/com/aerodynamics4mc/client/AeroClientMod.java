@@ -4,21 +4,20 @@ import com.aerodynamics4mc.api.AeroWindSample;
 import com.aerodynamics4mc.api.SamplePolicy;
 import com.aerodynamics4mc.net.AeroClientL2PreferencePayload;
 import com.aerodynamics4mc.net.AeroCoarseWindPayload;
-import com.aerodynamics4mc.net.AeroFlowPayload;
 import com.aerodynamics4mc.net.AeroFlowAnalysisPayload;
+import com.aerodynamics4mc.net.AeroFlowPayload;
 import com.aerodynamics4mc.net.AeroRuntimeStatePayload;
-
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 
 public final class AeroClientMod implements ClientModInitializer {
     private static AeroClientMod instance;
@@ -40,27 +39,27 @@ public final class AeroClientMod implements ClientModInitializer {
         registerClientCommandInterceptor();
     }
 
-    public static AeroWindSample sampleFlow(ClientWorld world, Vec3d position) {
+    public static AeroWindSample sampleFlow(ClientLevel world, Vec3 position) {
         AeroClientMod active = instance;
         SamplePolicy policy = active != null && active.clientL2Solver.isExperimentalEnabled()
-            ? SamplePolicy.CLIENT_LOCAL_PREFERRED
-            : SamplePolicy.SERVER_AGGREGATED_PREFERRED;
+                ? SamplePolicy.CLIENT_LOCAL_PREFERRED
+                : SamplePolicy.SERVER_AGGREGATED_PREFERRED;
         return sampleFlow(world, position, policy);
     }
 
-    public static AeroWindSample sampleFlow(ClientWorld world, Vec3d position, SamplePolicy policy) {
+    public static AeroWindSample sampleFlow(ClientLevel world, Vec3 position, SamplePolicy policy) {
         AeroClientMod active = instance;
         if (active == null || world == null) {
             return AeroWindSample.ZERO;
         }
-        return active.visualizer.sampleFlow(world.getRegistryKey().getValue(), position, policy);
+        return active.visualizer.sampleFlow(world.dimension().identifier(), position, policy);
     }
 
-    public static Vec3d sampleWind(ClientWorld world, Vec3d position) {
+    public static Vec3 sampleWind(ClientLevel world, Vec3 position) {
         return sampleFlow(world, position).velocity();
     }
 
-    public static void notifyBlockStateChanged(ClientWorld world, BlockPos pos, BlockState oldState, BlockState newState) {
+    public static void notifyBlockStateChanged(ClientLevel world, BlockPos pos, BlockState oldState, BlockState newState) {
         AeroClientMod active = instance;
         if (active == null) {
             return;
@@ -71,9 +70,9 @@ public final class AeroClientMod implements ClientModInitializer {
     private void onRuntimeState(AeroRuntimeStatePayload payload, ClientPlayNetworking.Context context) {
         context.client().execute(() -> {
             visualizer.onRuntimeState(new AeroVisualizer.AeroFlowState(
-                payload.streamingEnabled(),
-                payload.renderVelocityVectors(),
-                payload.renderStreamlines()
+                    payload.streamingEnabled(),
+                    payload.renderVelocityVectors(),
+                    payload.renderStreamlines()
             ));
             irisWindBridge.onRuntimeState(payload.streamingEnabled());
             clientL2Solver.onRuntimeState(payload.streamingEnabled());
@@ -103,43 +102,43 @@ public final class AeroClientMod implements ClientModInitializer {
     private void registerClientCommands() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(
-                ClientCommandManager.literal("aero_client_l2")
-                    .executes(ctx -> clientL2Status(ctx.getSource()))
-                    .then(ClientCommandManager.literal("status")
-                        .executes(ctx -> clientL2Status(ctx.getSource())))
-                    .then(ClientCommandManager.literal("on")
-                        .executes(ctx -> setClientL2Experimental(ctx.getSource(), true)))
-                    .then(ClientCommandManager.literal("off")
-                        .executes(ctx -> setClientL2Experimental(ctx.getSource(), false)))
-                    .then(ClientCommandManager.literal("stress")
-                        .executes(ctx -> clientL2StressStatus(ctx.getSource()))
-                        .then(ClientCommandManager.literal("status")
-                            .executes(ctx -> clientL2StressStatus(ctx.getSource())))
-                        .then(ClientCommandManager.literal("off")
-                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "off")))
-                        .then(ClientCommandManager.literal("fan")
-                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "fan")))
-                        .then(ClientCommandManager.literal("thermal")
-                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "thermal")))
-                        .then(ClientCommandManager.literal("dirty")
-                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "dirty")))
-                        .then(ClientCommandManager.literal("mixed")
-                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "mixed"))))
+                    ClientCommandManager.literal("aero_client_l2")
+                            .executes(ctx -> clientL2Status(ctx.getSource()))
+                            .then(ClientCommandManager.literal("status")
+                                    .executes(ctx -> clientL2Status(ctx.getSource())))
+                            .then(ClientCommandManager.literal("on")
+                                    .executes(ctx -> setClientL2Experimental(ctx.getSource(), true)))
+                            .then(ClientCommandManager.literal("off")
+                                    .executes(ctx -> setClientL2Experimental(ctx.getSource(), false)))
+                            .then(ClientCommandManager.literal("stress")
+                                    .executes(ctx -> clientL2StressStatus(ctx.getSource()))
+                                    .then(ClientCommandManager.literal("status")
+                                            .executes(ctx -> clientL2StressStatus(ctx.getSource())))
+                                    .then(ClientCommandManager.literal("off")
+                                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "off")))
+                                    .then(ClientCommandManager.literal("fan")
+                                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "fan")))
+                                    .then(ClientCommandManager.literal("thermal")
+                                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "thermal")))
+                                    .then(ClientCommandManager.literal("dirty")
+                                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "dirty")))
+                                    .then(ClientCommandManager.literal("mixed")
+                                            .executes(ctx -> setClientL2Stress(ctx.getSource(), "mixed"))))
             );
             dispatcher.register(
-                ClientCommandManager.literal("aero")
-                    .then(ClientCommandManager.literal("render")
-                        .executes(ctx -> renderStatus(ctx.getSource()))
-                        .then(ClientCommandManager.literal("vectors")
-                            .then(ClientCommandManager.literal("on")
-                                .executes(ctx -> setRenderVelocityVectors(ctx.getSource(), true)))
-                            .then(ClientCommandManager.literal("off")
-                                .executes(ctx -> setRenderVelocityVectors(ctx.getSource(), false))))
-                        .then(ClientCommandManager.literal("streamlines")
-                            .then(ClientCommandManager.literal("on")
-                                .executes(ctx -> setRenderStreamlines(ctx.getSource(), true)))
-                            .then(ClientCommandManager.literal("off")
-                                .executes(ctx -> setRenderStreamlines(ctx.getSource(), false)))))
+                    ClientCommandManager.literal("aero")
+                            .then(ClientCommandManager.literal("render")
+                                    .executes(ctx -> renderStatus(ctx.getSource()))
+                                    .then(ClientCommandManager.literal("vectors")
+                                            .then(ClientCommandManager.literal("on")
+                                                    .executes(ctx -> setRenderVelocityVectors(ctx.getSource(), true)))
+                                            .then(ClientCommandManager.literal("off")
+                                                    .executes(ctx -> setRenderVelocityVectors(ctx.getSource(), false))))
+                                    .then(ClientCommandManager.literal("streamlines")
+                                            .then(ClientCommandManager.literal("on")
+                                                    .executes(ctx -> setRenderStreamlines(ctx.getSource(), true)))
+                                            .then(ClientCommandManager.literal("off")
+                                                    .executes(ctx -> setRenderStreamlines(ctx.getSource(), false)))))
             );
         });
     }
@@ -162,7 +161,7 @@ public final class AeroClientMod implements ClientModInitializer {
             return;
         }
         if (parts.length != 4) {
-            sendClientFeedback(Text.literal("Usage: /aero render <vectors|streamlines> <on|off>"));
+            sendClientFeedback(Component.literal("Usage: /aero render <vectors|streamlines> <on|off>"));
             return;
         }
         boolean enabled;
@@ -171,60 +170,60 @@ public final class AeroClientMod implements ClientModInitializer {
         } else if ("off".equals(parts[3])) {
             enabled = false;
         } else {
-            sendClientFeedback(Text.literal("Usage: /aero render <vectors|streamlines> <on|off>"));
+            sendClientFeedback(Component.literal("Usage: /aero render <vectors|streamlines> <on|off>"));
             return;
         }
         switch (parts[2]) {
             case "vectors" -> {
                 visualizer.setRenderVelocityVectors(enabled);
-                sendClientFeedback(Text.literal("Render vectors " + (enabled ? "enabled" : "disabled")));
+                sendClientFeedback(Component.literal("Render vectors " + (enabled ? "enabled" : "disabled")));
             }
             case "streamlines" -> {
                 visualizer.setRenderStreamlines(enabled);
-                sendClientFeedback(Text.literal("Render streamlines " + (enabled ? "enabled" : "disabled")));
+                sendClientFeedback(Component.literal("Render streamlines " + (enabled ? "enabled" : "disabled")));
             }
-            default -> sendClientFeedback(Text.literal("Usage: /aero render <vectors|streamlines> <on|off>"));
+            default -> sendClientFeedback(Component.literal("Usage: /aero render <vectors|streamlines> <on|off>"));
         }
     }
 
-    private void sendClientFeedback(Text message) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    private void sendClientFeedback(Component message) {
+        Minecraft client = Minecraft.getInstance();
         if (client.player != null) {
-            client.player.sendMessage(message, false);
+            client.player.displayClientMessage(message, false);
         }
     }
 
     private int clientL2Status(net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source) {
-        source.sendFeedback(Text.literal(clientL2Solver.status()));
+        source.sendFeedback(Component.literal(clientL2Solver.status()));
         return 1;
     }
 
     private int setClientL2Experimental(
-        net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source,
-        boolean enabled
+            net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source,
+            boolean enabled
     ) {
         clientL2Solver.setExperimentalEnabled(enabled);
         if (enabled) {
             visualizer.clearRemoteFlowFields();
         }
         sendClientL2Preference(enabled);
-        source.sendFeedback(Text.literal("Client L2 local solve " + (enabled ? "enabled" : "disabled")));
+        source.sendFeedback(Component.literal("Client L2 local solve " + (enabled ? "enabled" : "disabled")));
         return 1;
     }
 
     private int clientL2StressStatus(net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source) {
-        source.sendFeedback(Text.literal("Client L2 stress " + clientL2Solver.stressStatus()));
+        source.sendFeedback(Component.literal("Client L2 stress " + clientL2Solver.stressStatus()));
         return 1;
     }
 
     private int setClientL2Stress(
-        net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source,
-        String mode
+            net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source,
+            String mode
     ) {
         try {
-            source.sendFeedback(Text.literal(clientL2Solver.setStressMode(mode)));
+            source.sendFeedback(Component.literal(clientL2Solver.setStressMode(mode)));
         } catch (IllegalArgumentException error) {
-            source.sendFeedback(Text.literal(error.getMessage()));
+            source.sendFeedback(Component.literal(error.getMessage()));
             return 0;
         }
         return 1;
@@ -235,28 +234,28 @@ public final class AeroClientMod implements ClientModInitializer {
         return 1;
     }
 
-    private Text renderStatusText() {
-        return Text.literal(
-            "Render vectors=" + visualizer.renderVelocityVectorsEnabled()
-                + " streamlines=" + visualizer.renderStreamlinesEnabled()
+    private Component renderStatusText() {
+        return Component.literal(
+                "Render vectors=" + visualizer.renderVelocityVectorsEnabled()
+                        + " streamlines=" + visualizer.renderStreamlinesEnabled()
         );
     }
 
     private int setRenderVelocityVectors(
-        net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source,
-        boolean enabled
+            net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source,
+            boolean enabled
     ) {
         visualizer.setRenderVelocityVectors(enabled);
-        source.sendFeedback(Text.literal("Render vectors " + (enabled ? "enabled" : "disabled")));
+        source.sendFeedback(Component.literal("Render vectors " + (enabled ? "enabled" : "disabled")));
         return 1;
     }
 
     private int setRenderStreamlines(
-        net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source,
-        boolean enabled
+            net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource source,
+            boolean enabled
     ) {
         visualizer.setRenderStreamlines(enabled);
-        source.sendFeedback(Text.literal("Render streamlines " + (enabled ? "enabled" : "disabled")));
+        source.sendFeedback(Component.literal("Render streamlines " + (enabled ? "enabled" : "disabled")));
         return 1;
     }
 
