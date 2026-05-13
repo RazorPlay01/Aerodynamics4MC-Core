@@ -132,25 +132,25 @@ final class ClientL2Solver {
     private static final int FACE_COUNT = Direction.values().length;
     private static final int STATIC_REFRESH_TICKS = -1;
     private static final int LOCAL_PUBLISH_INTERVAL_TICKS = configuredInt(
-        "a4mc.clientL2.publishIntervalTicks",
-        "AERO_LBM_CLIENT_L2_PUBLISH_INTERVAL_TICKS",
-        1,
-        1,
-        200
+            "a4mc.clientL2.publishIntervalTicks",
+            "AERO_LBM_CLIENT_L2_PUBLISH_INTERVAL_TICKS",
+            1,
+            1,
+            200
     );
     private static final int LOCAL_PUBLISH_SAMPLE_STRIDE = configuredInt(
-        "a4mc.clientL2.publishSampleStride",
-        "AERO_LBM_CLIENT_L2_PUBLISH_SAMPLE_STRIDE",
-        BRICK_SIZE >= 128 ? 4 : 1,
-        1,
-        16
+            "a4mc.clientL2.publishSampleStride",
+            "AERO_LBM_CLIENT_L2_PUBLISH_SAMPLE_STRIDE",
+            BRICK_SIZE >= 128 ? 4 : 1,
+            1,
+            16
     );
     private static final int SOLVE_INTERVAL_TICKS = configuredInt(
-        "a4mc.clientL2.solveIntervalTicks",
-        "AERO_LBM_CLIENT_L2_SOLVE_INTERVAL_TICKS",
-        1,
-        1,
-        200
+            "a4mc.clientL2.solveIntervalTicks",
+            "AERO_LBM_CLIENT_L2_SOLVE_INTERVAL_TICKS",
+            1,
+            1,
+            200
     );
     private static final int BOUNDARY_REFERENCE_REFRESH_MIN_TICKS = 40;
     private static final int FAST_SUSPEND_COOLDOWN_TICKS = 10;
@@ -169,11 +169,11 @@ final class ClientL2Solver {
         CELL_COUNT
     );
     private static final int BOUNDARY_REFERENCE_CELLS_PER_TICK = configuredInt(
-        "a4mc.clientL2.boundaryReferenceCellsPerTick",
-        "AERO_LBM_CLIENT_L2_BOUNDARY_REFERENCE_CELLS_PER_TICK",
-        BRICK_SIZE >= 128 ? 16384 : 4096,
-        1,
-        CELL_COUNT
+            "a4mc.clientL2.boundaryReferenceCellsPerTick",
+            "AERO_LBM_CLIENT_L2_BOUNDARY_REFERENCE_CELLS_PER_TICK",
+            BRICK_SIZE >= 128 ? 16384 : 4096,
+            1,
+            CELL_COUNT
     );
     private static final long STATIC_BUILD_NANOS_PER_TICK = configuredInt(
         "a4mc.clientL2.staticBuildMicrosPerTick",
@@ -197,75 +197,75 @@ final class ClientL2Solver {
         50000
     ) * 1000L;
     private static final int STRESS_PATCHES_PER_TICK = configuredInt(
-        "a4mc.clientL2.stressPatchesPerTick",
-        "AERO_LBM_CLIENT_L2_STRESS_PATCHES_PER_TICK",
-        BRICK_SIZE >= 128 ? 512 : 64,
-        1,
-        CELL_COUNT
+            "a4mc.clientL2.stressPatchesPerTick",
+            "AERO_LBM_CLIENT_L2_STRESS_PATCHES_PER_TICK",
+            BRICK_SIZE >= 128 ? 512 : 64,
+            1,
+            CELL_COUNT
     );
     private static final int STRESS_INTERVAL_TICKS = configuredInt(
-        "a4mc.clientL2.stressIntervalTicks",
-        "AERO_LBM_CLIENT_L2_STRESS_INTERVAL_TICKS",
-        1,
-        1,
-        200
+            "a4mc.clientL2.stressIntervalTicks",
+            "AERO_LBM_CLIENT_L2_STRESS_INTERVAL_TICKS",
+            1,
+            1,
+            200
     );
     private static final int STATIC_PATCH_DEBOUNCE_TICKS = configuredInt(
-        "a4mc.clientL2.staticPatchDebounceTicks",
-        "AERO_LBM_CLIENT_L2_STATIC_PATCH_DEBOUNCE_TICKS",
-        0,
-        0,
-        20
+            "a4mc.clientL2.staticPatchDebounceTicks",
+            "AERO_LBM_CLIENT_L2_STATIC_PATCH_DEBOUNCE_TICKS",
+            0,
+            0,
+            20
     );
     private static final int BOUNDARY_REFRESH_AFTER_STATIC_PATCH_COOLDOWN_TICKS = configuredInt(
-        "a4mc.clientL2.boundaryRefreshAfterStaticPatchCooldownTicks",
-        "AERO_LBM_CLIENT_L2_BOUNDARY_REFRESH_AFTER_STATIC_PATCH_COOLDOWN_TICKS",
-        20,
-        0,
-        200
+            "a4mc.clientL2.boundaryRefreshAfterStaticPatchCooldownTicks",
+            "AERO_LBM_CLIENT_L2_BOUNDARY_REFRESH_AFTER_STATIC_PATCH_COOLDOWN_TICKS",
+            20,
+            0,
+            200
     );
     private static final int STATIC_PATCH_MAX_DEBOUNCE_TICKS = configuredInt(
-        "a4mc.clientL2.staticPatchMaxDebounceTicks",
-        "AERO_LBM_CLIENT_L2_STATIC_PATCH_MAX_DEBOUNCE_TICKS",
-        8,
-        1,
-        80
+            "a4mc.clientL2.staticPatchMaxDebounceTicks",
+            "AERO_LBM_CLIENT_L2_STATIC_PATCH_MAX_DEBOUNCE_TICKS",
+            8,
+            1,
+            80
     );
     private static final int STATIC_PATCH_BULK_CHANGE_THRESHOLD = configuredInt(
-        "a4mc.clientL2.staticPatchBulkChangeThreshold",
-        "AERO_LBM_CLIENT_L2_STATIC_PATCH_BULK_CHANGE_THRESHOLD",
-        8,
-        1,
-        CELL_COUNT
+            "a4mc.clientL2.staticPatchBulkChangeThreshold",
+            "AERO_LBM_CLIENT_L2_STATIC_PATCH_BULK_CHANGE_THRESHOLD",
+            8,
+            1,
+            CELL_COUNT
     );
     private static final int STATIC_PATCH_BULK_CELL_THRESHOLD = configuredInt(
-        "a4mc.clientL2.staticPatchBulkCellThreshold",
-        "AERO_LBM_CLIENT_L2_STATIC_PATCH_BULK_CELL_THRESHOLD",
-        256,
-        1,
-        CELL_COUNT
+            "a4mc.clientL2.staticPatchBulkCellThreshold",
+            "AERO_LBM_CLIENT_L2_STATIC_PATCH_BULK_CELL_THRESHOLD",
+            256,
+            1,
+            CELL_COUNT
     );
     private static final int STATIC_CACHE_MAX_BRICKS = configuredInt(
-        "a4mc.clientL2.staticCacheMaxBricks",
-        "AERO_LBM_CLIENT_L2_STATIC_CACHE_MAX_BRICKS",
-        BRICK_SIZE >= 128 ? 2 : 32,
-        0,
-        64
+            "a4mc.clientL2.staticCacheMaxBricks",
+            "AERO_LBM_CLIENT_L2_STATIC_CACHE_MAX_BRICKS",
+            BRICK_SIZE >= 128 ? 2 : 32,
+            0,
+            64
     );
     private static final int COUPLING_BAND_CELLS = 8;
     private static final int MAX_CLIENT_ACTIVE_BRICKS = configuredInt(
-        "a4mc.clientL2.maxActiveBricks",
-        "AERO_LBM_CLIENT_L2_MAX_ACTIVE_BRICKS",
-        BRICK_SIZE >= 128 ? 1 : 2,
-        1,
-        8
+            "a4mc.clientL2.maxActiveBricks",
+            "AERO_LBM_CLIENT_L2_MAX_ACTIVE_BRICKS",
+            BRICK_SIZE >= 128 ? 1 : 2,
+            1,
+            8
     );
     private static final int MAX_STEPS_PER_CLIENT_TICK = configuredInt(
-        "a4mc.clientL2.maxStepsPerClientTick",
-        "AERO_LBM_CLIENT_L2_MAX_STEPS_PER_CLIENT_TICK",
-        1,
-        1,
-        16
+            "a4mc.clientL2.maxStepsPerClientTick",
+            "AERO_LBM_CLIENT_L2_MAX_STEPS_PER_CLIENT_TICK",
+            1,
+            1,
+            16
     );
     private static final float DT_SECONDS = 0.05f;
     private static final float DX_METERS = 1.0f;
@@ -297,11 +297,11 @@ final class ClientL2Solver {
     private static final byte SURFACE_KIND_FAN_Z_POS = 37;
     private static final int WORKER_QUEUE_CAPACITY = 128;
     private static final int STRESS_QUEUE_BACKLOG_LIMIT = configuredInt(
-        "a4mc.clientL2.stressQueueBacklogLimit",
-        "AERO_LBM_CLIENT_L2_STRESS_QUEUE_BACKLOG_LIMIT",
-        16,
-        0,
-        WORKER_QUEUE_CAPACITY
+            "a4mc.clientL2.stressQueueBacklogLimit",
+            "AERO_LBM_CLIENT_L2_STRESS_QUEUE_BACKLOG_LIMIT",
+            16,
+            0,
+            WORKER_QUEUE_CAPACITY
     );
     private static final int ALL_OPEN_FACE_MASK = (1 << FACE_COUNT) - 1;
     private static final boolean CLIENT_L2_DEFAULT_ENABLED = CLIENT_L2_MODE != SolverMode.OFF && configuredBoolean(
@@ -351,15 +351,15 @@ final class ClientL2Solver {
     private final float[] flowState = new float[CELL_COUNT * FLOW_CHANNELS];
     private final float[] airTemperature = new float[CELL_COUNT];
     private final float[] surfaceTemperature = new float[CELL_COUNT];
-    private final BlockPos.Mutable staticCursor = new BlockPos.Mutable();
-    private final BlockPos.Mutable staticNeighbor = new BlockPos.Mutable();
+    private final BlockPos.MutableBlockPos staticCursor = new BlockPos.MutableBlockPos();
+    private final BlockPos.MutableBlockPos staticNeighbor = new BlockPos.MutableBlockPos();
     private final LinkedHashMap<StaticBrickCacheKey, StaticBrickSnapshot> staticBrickCache =
-        new LinkedHashMap<>(STATIC_CACHE_MAX_BRICKS, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<StaticBrickCacheKey, StaticBrickSnapshot> eldest) {
-                return size() > STATIC_CACHE_MAX_BRICKS;
-            }
-        };
+            new LinkedHashMap<>(STATIC_CACHE_MAX_BRICKS, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<StaticBrickCacheKey, StaticBrickSnapshot> eldest) {
+                    return size() > STATIC_CACHE_MAX_BRICKS;
+                }
+            };
     private final int[] activeBrickX = new int[MAX_CLIENT_ACTIVE_BRICKS];
     private final int[] activeBrickY = new int[MAX_CLIENT_ACTIVE_BRICKS];
     private final int[] activeBrickZ = new int[MAX_CLIENT_ACTIVE_BRICKS];
@@ -469,25 +469,25 @@ final class ClientL2Solver {
             value = System.getenv(envName);
         }
         if (value == null || value.isBlank()) {
-            return MathHelper.clamp(defaultValue, min, max);
+            return Mth.clamp(defaultValue, min, max);
         }
         try {
             int parsed = Integer.parseInt(value.trim());
-            int clamped = MathHelper.clamp(parsed, min, max);
+            int clamped = Mth.clamp(parsed, min, max);
             if (clamped != parsed) {
                 LOGGER.warn(
-                    "Client L2 config {}={} outside [{}, {}]; using {}",
-                    propertyName,
-                    parsed,
-                    min,
-                    max,
-                    clamped
+                        "Client L2 config {}={} outside [{}, {}]; using {}",
+                        propertyName,
+                        parsed,
+                        min,
+                        max,
+                        clamped
                 );
             }
             return clamped;
         } catch (NumberFormatException ignored) {
             LOGGER.warn("Client L2 config {}={} is not an integer; using {}", propertyName, value, defaultValue);
-            return MathHelper.clamp(defaultValue, min, max);
+            return Mth.clamp(defaultValue, min, max);
         }
     }
 
@@ -544,7 +544,7 @@ final class ClientL2Solver {
         lastServerTick = serverTick;
     }
 
-    void onBlockStateChanged(ClientWorld world, BlockPos pos, BlockState oldState, BlockState newState) {
+    void onBlockStateChanged(ClientLevel world, BlockPos pos, BlockState oldState, BlockState newState) {
         if (world == null || pos == null || oldState == newState || (oldState != null && oldState.equals(newState))) {
             return;
         }
@@ -562,25 +562,25 @@ final class ClientL2Solver {
         if (!blockPatchTouchesActiveBrick(pos)) {
             return;
         }
-        queueStaticPatchPositions(dimensionId, worldKey, world.getTime(), pos, oldState, newState);
+        queueStaticPatchPositions(dimensionId, worldKey, world.getGameTime(), pos, oldState, newState);
     }
 
-    private void onClientTick(MinecraftClient client) {
+    private void onClientTick(Minecraft client) {
         drainWorkerAtlases();
-        if (!experimentalEnabled || !streamingEnabled || client.world == null || client.player == null) {
+        if (!experimentalEnabled || !streamingEnabled || client.level == null || client.player == null) {
             return;
         }
         if (clientSolveDisabled) {
             return;
         }
-        ClientWorld world = client.world;
-        long clientGameTime = world.getTime();
+        ClientLevel world = client.level;
+        long clientGameTime = world.getGameTime();
         if (lastProcessedClientGameTime == clientGameTime) {
             return;
         }
         lastProcessedClientGameTime = clientGameTime;
 
-        float horizontalSpeed = AeroWindSamplingRules.horizontalSpeedMetersPerSecond(client.player.getVelocity());
+        float horizontalSpeed = AeroWindSamplingRules.horizontalSpeedMetersPerSecond(client.player.getDeltaMovement());
         if (shouldSuspendForFastMovement(horizontalSpeed, clientGameTime)) {
             suspendForFastMovement(clientGameTime);
             return;
@@ -590,8 +590,8 @@ final class ClientL2Solver {
             return;
         }
 
-        Identifier dimensionId = world.getRegistryKey().getValue();
-        BlockPos playerBlockPos = client.player.getBlockPos();
+        Identifier dimensionId = world.dimension().identifier();
+        BlockPos playerBlockPos = client.player.getOnPos();
         BlockPos origin = brickOrigin(playerBlockPos);
         int brickX = Math.floorDiv(origin.getX(), BRICK_SIZE);
         int brickY = Math.floorDiv(origin.getY(), BRICK_SIZE);
@@ -646,12 +646,12 @@ final class ClientL2Solver {
         }
         maybeSubmitStressDeltas(dimensionId, clientGameTime);
         if (!submittedStaticPatch
-            && lastSolveClientGameTime != Long.MIN_VALUE
-            && clientGameTime - lastSolveClientGameTime < SOLVE_INTERVAL_TICKS) {
+                && lastSolveClientGameTime != Long.MIN_VALUE
+                && clientGameTime - lastSolveClientGameTime < SOLVE_INTERVAL_TICKS) {
             return;
         }
         boolean publish = lastPublishedClientGameTime == Long.MIN_VALUE
-            || clientGameTime - lastPublishedClientGameTime >= LOCAL_PUBLISH_INTERVAL_TICKS;
+                || clientGameTime - lastPublishedClientGameTime >= LOCAL_PUBLISH_INTERVAL_TICKS;
         worker.requestStep(worldKey, publishTargets(dimensionId, publish), MAX_STEPS_PER_CLIENT_TICK);
         lastSolveClientGameTime = clientGameTime;
         if (publish) {
@@ -663,10 +663,10 @@ final class ClientL2Solver {
         LocalAtlasSnapshot snapshot;
         while ((snapshot = worker.pollAtlas()) != null) {
             visualizer.onLocalFlowField(
-                snapshot.dimensionId(),
-                snapshot.origin(),
-                snapshot.sampleStride(),
-                snapshot.packedFlow()
+                    snapshot.dimensionId(),
+                    snapshot.origin(),
+                    snapshot.sampleStride(),
+                    snapshot.packedFlow()
             );
         }
     }
@@ -699,7 +699,7 @@ final class ClientL2Solver {
             return;
         }
         if (lastStressSubmitGameTime != Long.MIN_VALUE
-            && clientGameTime - lastStressSubmitGameTime < STRESS_INTERVAL_TICKS) {
+                && clientGameTime - lastStressSubmitGameTime < STRESS_INTERVAL_TICKS) {
             return;
         }
         if (stressStaticSubmittedForActiveSet && stressModeIsStatic(stressMode)) {
@@ -713,9 +713,9 @@ final class ClientL2Solver {
             return;
         }
         BlockPos origin = brickOrigin(
-            activeBrickX[activeIndex],
-            activeBrickY[activeIndex],
-            activeBrickZ[activeIndex]
+                activeBrickX[activeIndex],
+                activeBrickY[activeIndex],
+                activeBrickZ[activeIndex]
         );
         NativeSimulationBridge.WorldDelta[] deltas = new NativeSimulationBridge.WorldDelta[STRESS_PATCHES_PER_TICK];
         int count = 0;
@@ -746,28 +746,28 @@ final class ClientL2Solver {
             }
 
             int packedState = (solid ? 1 : 0)
-                | ((Byte.toUnsignedInt(syntheticSurfaceKind) & 0xFF) << 8);
+                    | ((Byte.toUnsignedInt(syntheticSurfaceKind) & 0xFF) << 8);
             deltas[count++] = new NativeSimulationBridge.WorldDelta(
-                NativeSimulationBridge.WORLD_DELTA_BRICK_STATIC_CELL_PATCH,
-                origin.getX() + x,
-                origin.getY() + y,
-                origin.getZ() + z,
-                (int) worldKey,
-                packedState,
-                syntheticOpenFaceMask,
-                0,
-                syntheticEmitterPower,
-                0.0f,
-                0.0f,
-                0.0f
+                    NativeSimulationBridge.WORLD_DELTA_BRICK_STATIC_CELL_PATCH,
+                    origin.getX() + x,
+                    origin.getY() + y,
+                    origin.getZ() + z,
+                    (int) worldKey,
+                    packedState,
+                    syntheticOpenFaceMask,
+                    0,
+                    syntheticEmitterPower,
+                    0.0f,
+                    0.0f,
+                    0.0f
             );
         }
         if (count == 0) {
             return;
         }
         NativeSimulationBridge.WorldDelta[] submitted = count == deltas.length
-            ? deltas
-            : java.util.Arrays.copyOf(deltas, count);
+                ? deltas
+                : java.util.Arrays.copyOf(deltas, count);
         if (stressStartedGameTime == Long.MIN_VALUE) {
             stressStartedGameTime = clientGameTime;
         }
@@ -859,27 +859,27 @@ final class ClientL2Solver {
     }
 
     private boolean activeSetMatches(
-        int coreBrickX,
-        int coreBrickY,
-        int coreBrickZ,
-        int localX,
-        int localY,
-        int localZ
+            int coreBrickX,
+            int coreBrickY,
+            int coreBrickZ,
+            int localX,
+            int localY,
+            int localZ
     ) {
         int expectedIndex = 0;
         if (!activeBrickMatches(expectedIndex++, coreBrickX, coreBrickY, coreBrickZ)) {
             return false;
         }
         int[] neighborOffset = MAX_CLIENT_ACTIVE_BRICKS > 1
-            ? nearestBoundaryNeighborOffset(localX, localY, localZ)
-            : null;
+                ? nearestBoundaryNeighborOffset(localX, localY, localZ)
+                : null;
         if (neighborOffset != null
-            && !activeBrickMatches(
+                && !activeBrickMatches(
                 expectedIndex++,
                 coreBrickX + neighborOffset[0],
                 coreBrickY + neighborOffset[1],
                 coreBrickZ + neighborOffset[2]
-            )) {
+        )) {
             return false;
         }
         return activeBrickCount == expectedIndex;
@@ -929,23 +929,23 @@ final class ClientL2Solver {
             bestY = 0;
             bestZ = 1;
         }
-        return bestDistance < COUPLING_BAND_CELLS ? new int[] {bestX, bestY, bestZ} : null;
+        return bestDistance < COUPLING_BAND_CELLS ? new int[]{bestX, bestY, bestZ} : null;
     }
 
     private boolean activeBrickMatches(int index, int brickX, int brickY, int brickZ) {
         return index < activeBrickCount
-            && activeBrickX[index] == brickX
-            && activeBrickY[index] == brickY
-            && activeBrickZ[index] == brickZ;
+                && activeBrickX[index] == brickX
+                && activeBrickY[index] == brickY
+                && activeBrickZ[index] == brickZ;
     }
 
     private void buildActiveBrickSet(
-        int coreBrickX,
-        int coreBrickY,
-        int coreBrickZ,
-        int localX,
-        int localY,
-        int localZ
+            int coreBrickX,
+            int coreBrickY,
+            int coreBrickZ,
+            int localX,
+            int localY,
+            int localZ
     ) {
         int oldActiveBrickCount = activeBrickCount;
         int[] oldActiveBrickX = java.util.Arrays.copyOf(activeBrickX, oldActiveBrickCount);
@@ -961,42 +961,42 @@ final class ClientL2Solver {
         java.util.Arrays.fill(activeBrickRefreshPending, false);
         java.util.Arrays.fill(activeBrickBoundaryRefreshPending, false);
         addActiveBrick(
-            coreBrickX,
-            coreBrickY,
-            coreBrickZ,
-            oldActiveBrickX,
-            oldActiveBrickY,
-            oldActiveBrickZ,
-            oldActiveBrickReady
-        );
-        int[] neighborOffset = MAX_CLIENT_ACTIVE_BRICKS > 1
-            ? nearestBoundaryNeighborOffset(localX, localY, localZ)
-            : null;
-        if (neighborOffset != null) {
-            addActiveBrick(
-                coreBrickX + neighborOffset[0],
-                coreBrickY + neighborOffset[1],
-                coreBrickZ + neighborOffset[2],
+                coreBrickX,
+                coreBrickY,
+                coreBrickZ,
                 oldActiveBrickX,
                 oldActiveBrickY,
                 oldActiveBrickZ,
                 oldActiveBrickReady
+        );
+        int[] neighborOffset = MAX_CLIENT_ACTIVE_BRICKS > 1
+                ? nearestBoundaryNeighborOffset(localX, localY, localZ)
+                : null;
+        if (neighborOffset != null) {
+            addActiveBrick(
+                    coreBrickX + neighborOffset[0],
+                    coreBrickY + neighborOffset[1],
+                    coreBrickZ + neighborOffset[2],
+                    oldActiveBrickX,
+                    oldActiveBrickY,
+                    oldActiveBrickZ,
+                    oldActiveBrickReady
             );
         }
         activeHintCoords = java.util.Arrays.copyOf(
-            activeHintCoords,
-            activeBrickCount * NativeSimulationBridge.BRICK_HINT_COORDS_PER_BRICK
+                activeHintCoords,
+                activeBrickCount * NativeSimulationBridge.BRICK_HINT_COORDS_PER_BRICK
         );
     }
 
     private void addActiveBrick(
-        int brickX,
-        int brickY,
-        int brickZ,
-        int[] oldActiveBrickX,
-        int[] oldActiveBrickY,
-        int[] oldActiveBrickZ,
-        boolean[] oldActiveBrickReady
+            int brickX,
+            int brickY,
+            int brickZ,
+            int[] oldActiveBrickX,
+            int[] oldActiveBrickY,
+            int[] oldActiveBrickZ,
+            boolean[] oldActiveBrickReady
     ) {
         if (activeBrickCount >= MAX_CLIENT_ACTIVE_BRICKS) {
             return;
@@ -1006,13 +1006,13 @@ final class ClientL2Solver {
         activeBrickY[index] = brickY;
         activeBrickZ[index] = brickZ;
         activeBrickReady[index] = wasActiveBrickReady(
-            brickX,
-            brickY,
-            brickZ,
-            oldActiveBrickX,
-            oldActiveBrickY,
-            oldActiveBrickZ,
-            oldActiveBrickReady
+                brickX,
+                brickY,
+                brickZ,
+                oldActiveBrickX,
+                oldActiveBrickY,
+                oldActiveBrickZ,
+                oldActiveBrickReady
         );
         activeBrickBoundaryRefreshPending[index] = true;
         int hintBase = index * NativeSimulationBridge.BRICK_HINT_COORDS_PER_BRICK;
@@ -1022,26 +1022,26 @@ final class ClientL2Solver {
     }
 
     private boolean wasActiveBrickReady(
-        int brickX,
-        int brickY,
-        int brickZ,
-        int[] oldActiveBrickX,
-        int[] oldActiveBrickY,
-        int[] oldActiveBrickZ,
-        boolean[] oldActiveBrickReady
+            int brickX,
+            int brickY,
+            int brickZ,
+            int[] oldActiveBrickX,
+            int[] oldActiveBrickY,
+            int[] oldActiveBrickZ,
+            boolean[] oldActiveBrickReady
     ) {
         for (int index = 0; index < oldActiveBrickReady.length; index++) {
             if (oldActiveBrickReady[index]
-                && oldActiveBrickX[index] == brickX
-                && oldActiveBrickY[index] == brickY
-                && oldActiveBrickZ[index] == brickZ) {
+                    && oldActiveBrickX[index] == brickX
+                    && oldActiveBrickY[index] == brickY
+                    && oldActiveBrickZ[index] == brickZ) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean prepareActiveBricks(MinecraftClient client, ClientWorld world, Identifier dimensionId) {
+    private boolean prepareActiveBricks(Minecraft client, ClientLevel world, Identifier dimensionId) {
         if (activeBrickCount <= 0) {
             return false;
         }
@@ -1075,10 +1075,10 @@ final class ClientL2Solver {
     }
 
     private BrickPreparationResult uploadAndSeedActiveBrick(
-        MinecraftClient client,
-        ClientWorld world,
-        Identifier dimensionId,
-        int activeIndex
+            Minecraft client,
+            ClientLevel world,
+            Identifier dimensionId,
+            int activeIndex
     ) {
         int brickX = activeBrickX[activeIndex];
         int brickY = activeBrickY[activeIndex];
@@ -1097,21 +1097,21 @@ final class ClientL2Solver {
         }
         if (!stagedDynamicUploaded) {
             worker.submitBrickSeed(new BrickSeedCommand(
-                worldKey,
-                brickX,
-                brickY,
-                brickZ,
-                java.util.Arrays.copyOf(obstacle, obstacle.length),
-                java.util.Arrays.copyOf(surfaceKind, surfaceKind.length),
-                java.util.Arrays.copyOf(openFaceMask, openFaceMask.length),
-                java.util.Arrays.copyOf(emitterPower, emitterPower.length),
-                java.util.Arrays.copyOf(sourceFanDirection, sourceFanDirection.length),
-                java.util.Arrays.copyOf(sourceEmitterPower, sourceEmitterPower.length),
-                java.util.Arrays.copyOf(faceSkyExposure, faceSkyExposure.length),
-                java.util.Arrays.copyOf(faceDirectExposure, faceDirectExposure.length),
-                java.util.Arrays.copyOf(flowState, flowState.length),
-                java.util.Arrays.copyOf(airTemperature, airTemperature.length),
-                java.util.Arrays.copyOf(surfaceTemperature, surfaceTemperature.length)
+                    worldKey,
+                    brickX,
+                    brickY,
+                    brickZ,
+                    java.util.Arrays.copyOf(obstacle, obstacle.length),
+                    java.util.Arrays.copyOf(surfaceKind, surfaceKind.length),
+                    java.util.Arrays.copyOf(openFaceMask, openFaceMask.length),
+                    java.util.Arrays.copyOf(emitterPower, emitterPower.length),
+                    java.util.Arrays.copyOf(sourceFanDirection, sourceFanDirection.length),
+                    java.util.Arrays.copyOf(sourceEmitterPower, sourceEmitterPower.length),
+                    java.util.Arrays.copyOf(faceSkyExposure, faceSkyExposure.length),
+                    java.util.Arrays.copyOf(faceDirectExposure, faceDirectExposure.length),
+                    java.util.Arrays.copyOf(flowState, flowState.length),
+                    java.util.Arrays.copyOf(airTemperature, airTemperature.length),
+                    java.util.Arrays.copyOf(surfaceTemperature, surfaceTemperature.length)
             ));
             stagedDynamicUploaded = true;
             return BrickPreparationResult.IN_PROGRESS;
@@ -1121,27 +1121,27 @@ final class ClientL2Solver {
     }
 
     private boolean stagedPreparationMatches(
-        int activeIndex,
-        Identifier dimensionId,
-        int brickX,
-        int brickY,
-        int brickZ
+            int activeIndex,
+            Identifier dimensionId,
+            int brickX,
+            int brickY,
+            int brickZ
     ) {
         return stagedActiveIndex == activeIndex
-            && stagedDimension != null
-            && stagedDimension.equals(dimensionId)
-            && stagedBrickX == brickX
-            && stagedBrickY == brickY
-            && stagedBrickZ == brickZ;
+                && stagedDimension != null
+                && stagedDimension.equals(dimensionId)
+                && stagedBrickX == brickX
+                && stagedBrickY == brickY
+                && stagedBrickZ == brickZ;
     }
 
     private void beginStagedPreparation(
-        int activeIndex,
-        Identifier dimensionId,
-        BlockPos origin,
-        int brickX,
-        int brickY,
-        int brickZ
+            int activeIndex,
+            Identifier dimensionId,
+            BlockPos origin,
+            int brickX,
+            int brickY,
+            int brickZ
     ) {
         stagedActiveIndex = activeIndex;
         stagedDimension = dimensionId;
@@ -1178,7 +1178,7 @@ final class ClientL2Solver {
         }
     }
 
-    private boolean buildStagedStaticCells(ClientWorld world) {
+    private boolean buildStagedStaticCells(ClientLevel world) {
         if (stagedOrigin == null) {
             return false;
         }
@@ -1205,8 +1205,8 @@ final class ClientL2Solver {
             return;
         }
         staticBrickCache.put(
-            new StaticBrickCacheKey(stagedDimension, stagedBrickX, stagedBrickY, stagedBrickZ),
-            StaticBrickSnapshot.copyFrom(obstacle, surfaceKind, openFaceMask, emitterPower, sourceFanDirection, sourceEmitterPower)
+                new StaticBrickCacheKey(stagedDimension, stagedBrickX, stagedBrickY, stagedBrickZ),
+                StaticBrickSnapshot.copyFrom(obstacle, surfaceKind, openFaceMask, emitterPower, sourceFanDirection, sourceEmitterPower)
         );
         stagedStaticFromCache = true;
     }
@@ -1275,7 +1275,7 @@ final class ClientL2Solver {
         stagedSeedPressure = 0.0f;
     }
 
-    private boolean refreshActiveBrickStatic(MinecraftClient client, ClientWorld world) {
+    private boolean refreshActiveBrickStatic(Minecraft client, ClientLevel world) {
         if (STATIC_REFRESH_TICKS <= 0) {
             java.util.Arrays.fill(activeBrickRefreshPending, false);
             return false;
@@ -1322,29 +1322,29 @@ final class ClientL2Solver {
     }
 
     private boolean refreshActiveBrickBoundaryReference(
-        MinecraftClient client,
-        Identifier dimensionId,
-        long clientGameTime
+            Minecraft client,
+            Identifier dimensionId,
+            long clientGameTime
     ) {
         if (!hasBoundaryRefreshPending() && boundaryRefreshActiveIndex < 0) {
             return false;
         }
         if (lastStaticPatchSubmitClientGameTime != Long.MIN_VALUE
-            && clientGameTime - lastStaticPatchSubmitClientGameTime < BOUNDARY_REFRESH_AFTER_STATIC_PATCH_COOLDOWN_TICKS) {
+                && clientGameTime - lastStaticPatchSubmitClientGameTime < BOUNDARY_REFRESH_AFTER_STATIC_PATCH_COOLDOWN_TICKS) {
             return false;
         }
         if (stagedActiveIndex >= 0) {
             return false;
         }
         if (boundaryRefreshActiveIndex < 0
-            && lastBoundaryRefreshClientGameTime != Long.MIN_VALUE
-            && clientGameTime - lastBoundaryRefreshClientGameTime < BOUNDARY_REFERENCE_REFRESH_MIN_TICKS) {
+                && lastBoundaryRefreshClientGameTime != Long.MIN_VALUE
+                && clientGameTime - lastBoundaryRefreshClientGameTime < BOUNDARY_REFERENCE_REFRESH_MIN_TICKS) {
             return false;
         }
         for (int attempts = 0; attempts < activeBrickCount; attempts++) {
             int index = boundaryRefreshActiveIndex >= 0
-                ? boundaryRefreshActiveIndex
-                : (refreshCursor + attempts) % activeBrickCount;
+                    ? boundaryRefreshActiveIndex
+                    : (refreshCursor + attempts) % activeBrickCount;
             if (!activeBrickBoundaryRefreshPending[index]) {
                 if (boundaryRefreshActiveIndex >= 0) {
                     cancelBoundaryReferenceRefresh();
@@ -1374,14 +1374,14 @@ final class ClientL2Solver {
                 return false;
             }
             worker.submitBoundaryReference(new BoundaryReferenceCommand(
-                worldKey,
-                brickX,
-                brickY,
-                brickZ,
-                java.util.Arrays.copyOf(flowState, flowState.length),
-                java.util.Arrays.copyOf(airTemperature, airTemperature.length),
-                java.util.Arrays.copyOf(surfaceTemperature, surfaceTemperature.length),
-                boundaryRefreshMaxCoarseSpeed
+                    worldKey,
+                    brickX,
+                    brickY,
+                    brickZ,
+                    java.util.Arrays.copyOf(flowState, flowState.length),
+                    java.util.Arrays.copyOf(airTemperature, airTemperature.length),
+                    java.util.Arrays.copyOf(surfaceTemperature, surfaceTemperature.length),
+                    boundaryRefreshMaxCoarseSpeed
             ));
             activeBrickBoundaryRefreshPending[index] = false;
             refreshCursor = (index + 1) % activeBrickCount;
@@ -1393,27 +1393,27 @@ final class ClientL2Solver {
     }
 
     private boolean boundaryReferenceRefreshMatches(
-        int activeIndex,
-        Identifier dimensionId,
-        int brickX,
-        int brickY,
-        int brickZ
+            int activeIndex,
+            Identifier dimensionId,
+            int brickX,
+            int brickY,
+            int brickZ
     ) {
         return boundaryRefreshActiveIndex == activeIndex
-            && boundaryRefreshDimension != null
-            && boundaryRefreshDimension.equals(dimensionId)
-            && boundaryRefreshBrickX == brickX
-            && boundaryRefreshBrickY == brickY
-            && boundaryRefreshBrickZ == brickZ;
+                && boundaryRefreshDimension != null
+                && boundaryRefreshDimension.equals(dimensionId)
+                && boundaryRefreshBrickX == brickX
+                && boundaryRefreshBrickY == brickY
+                && boundaryRefreshBrickZ == brickZ;
     }
 
     private void beginBoundaryReferenceRefresh(
-        int activeIndex,
-        Identifier dimensionId,
-        BlockPos origin,
-        int brickX,
-        int brickY,
-        int brickZ
+            int activeIndex,
+            Identifier dimensionId,
+            BlockPos origin,
+            int brickX,
+            int brickY,
+            int brickZ
     ) {
         boundaryRefreshActiveIndex = activeIndex;
         boundaryRefreshDimension = dimensionId;
@@ -1472,8 +1472,18 @@ final class ClientL2Solver {
             }
         }
         return boundaryRefreshCursor >= CELL_COUNT
-            ? BoundaryReferenceBuildResult.COMPLETED
-            : BoundaryReferenceBuildResult.IN_PROGRESS;
+                ? BoundaryReferenceBuildResult.COMPLETED
+                : BoundaryReferenceBuildResult.IN_PROGRESS;
+    }
+
+    private boolean isBoundaryReferenceCell(int x, int y, int z) {
+        int layers = Math.min(8, BRICK_SIZE);
+        return x < layers
+                || y < layers
+                || z < layers
+                || x >= BRICK_SIZE - layers
+                || y >= BRICK_SIZE - layers
+                || z >= BRICK_SIZE - layers;
     }
 
     private boolean isBoundaryReferenceCell(int x, int y, int z) {
@@ -1506,7 +1516,7 @@ final class ClientL2Solver {
         return false;
     }
 
-    private boolean uploadStaticBrick(ClientWorld world, BlockPos origin, int brickX, int brickY, int brickZ) {
+    private boolean uploadStaticBrick(ClientLevel world, BlockPos origin, int brickX, int brickY, int brickZ) {
         StaticBrickCacheKey key = activeDimension == null ? null : new StaticBrickCacheKey(activeDimension, brickX, brickY, brickZ);
         StaticBrickSnapshot cached = key == null ? null : staticBrickCache.get(key);
         if (cached != null) {
@@ -1523,16 +1533,16 @@ final class ClientL2Solver {
     }
 
     private void queueStaticPatchPositions(
-        Identifier dimensionId,
-        long patchWorldKey,
-        long clientGameTime,
-        BlockPos center,
-        BlockState oldState,
-        BlockState newState
+            Identifier dimensionId,
+            long patchWorldKey,
+            long clientGameTime,
+            BlockPos center,
+            BlockState oldState,
+            BlockState newState
     ) {
         if (pendingStaticPatchWorldKey != patchWorldKey
-            || pendingStaticPatchDimension == null
-            || !pendingStaticPatchDimension.equals(dimensionId)) {
+                || pendingStaticPatchDimension == null
+                || !pendingStaticPatchDimension.equals(dimensionId)) {
             pendingSourcePatches.clear();
             pendingStaticPatchDimension = dimensionId;
             pendingStaticPatchWorldKey = patchWorldKey;
@@ -1545,27 +1555,27 @@ final class ClientL2Solver {
         }
         pendingStaticPatchLastChangeGameTime = clientGameTime;
         pendingStaticPatchSourceChanges++;
-        BlockPos key = center.toImmutable();
+        BlockPos key = center.immutable();
         PendingSourcePatch existing = pendingSourcePatches.get(key);
         pendingSourcePatches.put(
-            key,
-            new PendingSourcePatch(key, existing == null ? oldState : existing.oldState(), newState)
+                key,
+                new PendingSourcePatch(key, existing == null ? oldState : existing.oldState(), newState)
         );
         lastStaticPatchCount = pendingSourcePatches.size();
         lastFanPatchCellCount = 0;
         lastHeatPatchCellCount = 0;
     }
 
-    private StaticPatchFlushResult flushPendingStaticPatches(ClientWorld world, Identifier dimensionId, long clientGameTime) {
+    private StaticPatchFlushResult flushPendingStaticPatches(ClientLevel world, Identifier dimensionId, long clientGameTime) {
         if (pendingSourcePatches.isEmpty()) {
             return StaticPatchFlushResult.NONE;
         }
         if (activeDimension == null
-            || !activeDimension.equals(dimensionId)
-            || pendingStaticPatchDimension == null
-            || !pendingStaticPatchDimension.equals(dimensionId)
-            || pendingStaticPatchWorldKey != worldKey
-            || worldKey == 0L) {
+                || !activeDimension.equals(dimensionId)
+                || pendingStaticPatchDimension == null
+                || !pendingStaticPatchDimension.equals(dimensionId)
+                || pendingStaticPatchWorldKey != worldKey
+                || worldKey == 0L) {
             clearPendingStaticPatches();
             return StaticPatchFlushResult.NONE;
         }
@@ -1597,8 +1607,8 @@ final class ClientL2Solver {
             return StaticPatchFlushResult.NONE;
         }
         NativeSimulationBridge.WorldDelta[] submitted = count == deltas.length
-            ? deltas
-            : java.util.Arrays.copyOf(deltas, count);
+                ? deltas
+                : java.util.Arrays.copyOf(deltas, count);
         lastStaticPatchCount = submitted.length;
         lastFanPatchCellCount = fanSourcePatches;
         lastHeatPatchCellCount = heatSourcePatches;
@@ -1613,10 +1623,10 @@ final class ClientL2Solver {
             return false;
         }
         boolean bulkPatch = pendingStaticPatchSourceChanges >= STATIC_PATCH_BULK_CHANGE_THRESHOLD
-            || pendingSourcePatches.size() >= STATIC_PATCH_BULK_CELL_THRESHOLD;
+                || pendingSourcePatches.size() >= STATIC_PATCH_BULK_CELL_THRESHOLD;
         if (!bulkPatch
-            || pendingStaticPatchFirstChangeGameTime == Long.MIN_VALUE
-            || pendingStaticPatchLastChangeGameTime == Long.MIN_VALUE) {
+                || pendingStaticPatchFirstChangeGameTime == Long.MIN_VALUE
+                || pendingStaticPatchLastChangeGameTime == Long.MIN_VALUE) {
             return false;
         }
         long sinceFirstChange = clientGameTime - pendingStaticPatchFirstChangeGameTime;
@@ -1625,18 +1635,18 @@ final class ClientL2Solver {
             return false;
         }
         return sinceLastChange < STATIC_PATCH_DEBOUNCE_TICKS
-            && sinceFirstChange < STATIC_PATCH_MAX_DEBOUNCE_TICKS;
+                && sinceFirstChange < STATIC_PATCH_MAX_DEBOUNCE_TICKS;
     }
 
     private void addStaticPatchPositionsForChange(
-        java.util.LinkedHashSet<BlockPos> positions,
-        BlockPos center,
-        BlockState oldState,
-        BlockState newState
+            java.util.LinkedHashSet<BlockPos> positions,
+            BlockPos center,
+            BlockState oldState,
+            BlockState newState
     ) {
         addStaticPatchPosition(positions, center);
         for (Direction direction : Direction.values()) {
-            addStaticPatchPosition(positions, center.offset(direction));
+            addStaticPatchPosition(positions, center.relative(direction));
         }
         addFanOcclusionPatchPositions(positions, center);
         addHeatOcclusionPatchPositions(positions, center);
@@ -1645,7 +1655,7 @@ final class ClientL2Solver {
     }
 
     private void addStaticPatchPosition(java.util.LinkedHashSet<BlockPos> positions, BlockPos pos) {
-        positions.add(pos.toImmutable());
+        positions.add(pos.immutable());
     }
 
     private void addFanOcclusionPatchPositions(java.util.LinkedHashSet<BlockPos> positions, BlockPos center) {
@@ -1663,15 +1673,15 @@ final class ClientL2Solver {
     }
 
     private void addForcingSourcePatchPositions(
-        java.util.LinkedHashSet<BlockPos> positions,
-        BlockPos center,
-        BlockState state
+            java.util.LinkedHashSet<BlockPos> positions,
+            BlockPos center,
+            BlockState state
     ) {
         if (state == null) {
             return;
         }
-        if (state.isOf(ModBlocks.FAN_BLOCK)) {
-            Direction direction = state.getOrEmpty(FanBlock.FACING).orElse(Direction.NORTH);
+        if (state.is(ModBlocks.FAN_BLOCK)) {
+            Direction direction = state.getOptionalValue(FanBlock.FACING).orElse(Direction.NORTH);
             addFanFootprintPatchPositions(positions, center, direction);
         }
         if (sampleEmitterThermalPowerWatts(state) > 0.0f) {
@@ -1683,16 +1693,16 @@ final class ClientL2Solver {
 
     private BlockPos offset(BlockPos pos, Direction direction, int distance) {
         return new BlockPos(
-            pos.getX() + direction.getOffsetX() * distance,
-            pos.getY() + direction.getOffsetY() * distance,
-            pos.getZ() + direction.getOffsetZ() * distance
+                pos.getX() + direction.getStepX() * distance,
+                pos.getY() + direction.getStepY() * distance,
+                pos.getZ() + direction.getStepZ() * distance
         );
     }
 
     private void addFanFootprintPatchPositions(
-        java.util.LinkedHashSet<BlockPos> positions,
-        BlockPos fanPos,
-        Direction direction
+            java.util.LinkedHashSet<BlockPos> positions,
+            BlockPos fanPos,
+            Direction direction
     ) {
         for (int distance = 1; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
             addFanDiskPatchPositions(positions, offset(fanPos, direction, distance), direction);
@@ -1700,9 +1710,9 @@ final class ClientL2Solver {
     }
 
     private void addFanDiskPatchPositions(
-        java.util.LinkedHashSet<BlockPos> positions,
-        BlockPos center,
-        Direction direction
+            java.util.LinkedHashSet<BlockPos> positions,
+            BlockPos center,
+            Direction direction
     ) {
         Direction.Axis axis = direction.getAxis();
         for (int a = -FAN_FORCE_RADIUS_CELLS; a <= FAN_FORCE_RADIUS_CELLS; a++) {
@@ -1725,7 +1735,7 @@ final class ClientL2Solver {
             return true;
         }
         for (Direction direction : Direction.values()) {
-            if (blockInActiveBrick(center.offset(direction))) {
+            if (blockInActiveBrick(center.relative(direction))) {
                 return true;
             }
             for (int distance = 1; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
@@ -1760,27 +1770,27 @@ final class ClientL2Solver {
         return false;
     }
 
-    private NativeSimulationBridge.WorldDelta buildStaticCellPatchDelta(ClientWorld world, BlockPos pos) {
+    private NativeSimulationBridge.WorldDelta buildStaticCellPatchDelta(ClientLevel world, BlockPos pos) {
         StaticCellSample sample = sampleStaticCell(world, pos);
         int packedState = (sample.solid() ? 1 : 0)
-            | ((Byte.toUnsignedInt(sample.surfaceKind()) & 0xFF) << 8);
+                | ((Byte.toUnsignedInt(sample.surfaceKind()) & 0xFF) << 8);
         return new NativeSimulationBridge.WorldDelta(
-            NativeSimulationBridge.WORLD_DELTA_BRICK_STATIC_CELL_PATCH,
-            pos.getX(),
-            pos.getY(),
-            pos.getZ(),
-            (int) worldKey,
-            packedState,
-            Short.toUnsignedInt(sample.openFaceMask()),
-            0,
-            sample.emitterPowerWatts(),
-            0.0f,
-            0.0f,
-            0.0f
+                NativeSimulationBridge.WORLD_DELTA_BRICK_STATIC_CELL_PATCH,
+                pos.getX(),
+                pos.getY(),
+                pos.getZ(),
+                (int) worldKey,
+                packedState,
+                Short.toUnsignedInt(sample.openFaceMask()),
+                0,
+                sample.emitterPowerWatts(),
+                0.0f,
+                0.0f,
+                0.0f
         );
     }
 
-    private NativeSimulationBridge.WorldDelta buildStaticSourcePatchDelta(ClientWorld world, PendingSourcePatch patch) {
+    private NativeSimulationBridge.WorldDelta buildStaticSourcePatchDelta(ClientLevel world, PendingSourcePatch patch) {
         BlockPos pos = patch.pos();
         boolean oldSolid = sourceSolidForState(world, pos, patch.oldState());
         boolean newSolid = sourceSolidForState(world, pos, patch.newState());
@@ -1789,26 +1799,26 @@ final class ClientL2Solver {
         float oldEmitterPower = sourceEmitterPowerForState(patch.oldState());
         float newEmitterPower = sourceEmitterPowerForState(patch.newState());
         int packedState = (oldSolid ? 1 : 0)
-            | (newSolid ? 2 : 0)
-            | ((oldFanDirection & 0xFF) << 8)
-            | ((newFanDirection & 0xFF) << 16);
+                | (newSolid ? 2 : 0)
+                | ((oldFanDirection & 0xFF) << 8)
+                | ((newFanDirection & 0xFF) << 16);
         return new NativeSimulationBridge.WorldDelta(
-            NativeSimulationBridge.WORLD_DELTA_BRICK_STATIC_SOURCE_PATCH,
-            pos.getX(),
-            pos.getY(),
-            pos.getZ(),
-            (int) worldKey,
-            packedState,
-            0,
-            0,
-            oldEmitterPower,
-            newEmitterPower,
-            0.0f,
-            0.0f
+                NativeSimulationBridge.WORLD_DELTA_BRICK_STATIC_SOURCE_PATCH,
+                pos.getX(),
+                pos.getY(),
+                pos.getZ(),
+                (int) worldKey,
+                packedState,
+                0,
+                0,
+                oldEmitterPower,
+                newEmitterPower,
+                0.0f,
+                0.0f
         );
     }
 
-    private void refreshLocalStaticCellIfActive(ClientWorld world, BlockPos pos) {
+    private void refreshLocalStaticCellIfActive(ClientLevel world, BlockPos pos) {
         for (int index = 0; index < activeBrickCount; index++) {
             int brickX = Math.floorDiv(pos.getX(), BRICK_SIZE);
             int brickY = Math.floorDiv(pos.getY(), BRICK_SIZE);
@@ -1821,17 +1831,17 @@ final class ClientL2Solver {
             int localY = pos.getY() - origin.getY();
             int localZ = pos.getZ() - origin.getZ();
             if (localX >= 0 && localY >= 0 && localZ >= 0
-                && localX < BRICK_SIZE && localY < BRICK_SIZE && localZ < BRICK_SIZE) {
+                    && localX < BRICK_SIZE && localY < BRICK_SIZE && localZ < BRICK_SIZE) {
                 populateStaticCell(world, origin, localX, localY, localZ);
             }
         }
     }
 
     private void invalidateStaticCacheForPatchFootprint(
-        Identifier dimensionId,
-        BlockPos center,
-        BlockState oldState,
-        BlockState newState
+            Identifier dimensionId,
+            BlockPos center,
+            BlockState oldState,
+            BlockState newState
     ) {
         java.util.LinkedHashSet<BlockPos> positions = new java.util.LinkedHashSet<>();
         addStaticPatchPositionsForChange(positions, center, oldState, newState);
@@ -1842,10 +1852,10 @@ final class ClientL2Solver {
 
     private void invalidateStaticCacheForBlock(Identifier dimensionId, BlockPos pos) {
         staticBrickCache.remove(new StaticBrickCacheKey(
-            dimensionId,
-            Math.floorDiv(pos.getX(), BRICK_SIZE),
-            Math.floorDiv(pos.getY(), BRICK_SIZE),
-            Math.floorDiv(pos.getZ(), BRICK_SIZE)
+                dimensionId,
+                Math.floorDiv(pos.getX(), BRICK_SIZE),
+                Math.floorDiv(pos.getY(), BRICK_SIZE),
+                Math.floorDiv(pos.getZ(), BRICK_SIZE)
         ));
     }
 
@@ -1871,7 +1881,7 @@ final class ClientL2Solver {
         ticksSinceStaticRefresh = 0;
     }
 
-    private void populateStaticBrickArrays(ClientWorld world, BlockPos origin) {
+    private void populateStaticBrickArrays(ClientLevel world, BlockPos origin) {
         java.util.Arrays.fill(obstacle, (byte) 0);
         java.util.Arrays.fill(surfaceKind, (byte) 0);
         java.util.Arrays.fill(openFaceMask, (short) 0);
@@ -1890,7 +1900,7 @@ final class ClientL2Solver {
         }
     }
 
-    private void populateStaticCell(ClientWorld world, BlockPos origin, int x, int y, int z) {
+    private void populateStaticCell(ClientLevel world, BlockPos origin, int x, int y, int z) {
         staticCursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
         int cell = cellIndex(x, y, z);
         StaticCellSample sample = sampleStaticSourceCell(world, staticCursor);
@@ -1935,9 +1945,35 @@ final class ClientL2Solver {
         if (!solid) {
             for (Direction direction : Direction.values()) {
                 staticNeighbor.set(
-                    pos.getX() + direction.getOffsetX(),
-                    pos.getY() + direction.getOffsetY(),
-                    pos.getZ() + direction.getOffsetZ()
+                        pos.getX() + direction.getStepX(),
+                        pos.getY() + direction.getStepY(),
+                        pos.getZ() + direction.getStepZ()
+                );
+                if (!isSolidObstacle(world, staticNeighbor, world.getBlockState(staticNeighbor))) {
+                    mask = (short) (mask | (1 << direction.ordinal()));
+                }
+            }
+        }
+        return new StaticCellSample(
+                solid,
+                (byte) 0,
+                mask,
+                0.0f,
+                (byte) sourceFanDirectionCodeForState(state),
+                sourceEmitterPowerForState(state)
+        );
+    }
+
+    private StaticCellSample sampleStaticCell(ClientLevel world, BlockPos pos) {
+        BlockState state = world.getBlockState(pos);
+        boolean solid = isSolidObstacle(world, pos, state);
+        short mask = 0;
+        if (!solid) {
+            for (Direction direction : Direction.values()) {
+                staticNeighbor.set(
+                        pos.getX() + direction.getStepX(),
+                        pos.getY() + direction.getStepY(),
+                        pos.getZ() + direction.getStepZ()
                 );
                 if (!isSolidObstacle(world, staticNeighbor, world.getBlockState(staticNeighbor))) {
                     mask = (short) (mask | (1 << direction.ordinal()));
@@ -1947,16 +1983,16 @@ final class ClientL2Solver {
         byte kind = solid ? (byte) 0 : fanSurfaceKindForCell(world, pos);
         float emitter = solid ? 0.0f : emitterPowerForCell(world, pos, state);
         return new StaticCellSample(
-            solid,
-            kind,
-            mask,
-            emitter,
-            (byte) sourceFanDirectionCodeForState(state),
-            sourceEmitterPowerForState(state)
+                solid,
+                kind,
+                mask,
+                emitter,
+                (byte) sourceFanDirectionCodeForState(state),
+                sourceEmitterPowerForState(state)
         );
     }
 
-    private byte fanSurfaceKindForCell(ClientWorld world, BlockPos pos) {
+    private byte fanSurfaceKindForCell(ClientLevel world, BlockPos pos) {
         for (Direction direction : Direction.values()) {
             Direction.Axis axis = direction.getAxis();
             for (int distance = 1; distance <= FAN_FORCE_LENGTH_CELLS; distance++) {
@@ -1965,8 +2001,8 @@ final class ClientL2Solver {
                     for (int b = -FAN_FORCE_RADIUS_CELLS; b <= FAN_FORCE_RADIUS_CELLS; b++) {
                         BlockPos fanPos = offsetPerpendicular(axialOrigin, axis, -a, -b);
                         BlockState fanState = world.getBlockState(fanPos);
-                        if (!fanState.isOf(ModBlocks.FAN_BLOCK)
-                            || fanState.getOrEmpty(FanBlock.FACING).orElse(Direction.NORTH) != direction) {
+                        if (!fanState.is(ModBlocks.FAN_BLOCK)
+                                || fanState.getOptionalValue(FanBlock.FACING).orElse(Direction.NORTH) != direction) {
                             continue;
                         }
                         if (!fanPathClear(world, fanPos, direction, distance, a, b)) {
@@ -1980,13 +2016,13 @@ final class ClientL2Solver {
         return 0;
     }
 
-    private boolean fanPathClear(ClientWorld world, BlockPos fanPos, Direction direction, int distance, int a, int b) {
+    private boolean fanPathClear(ClientLevel world, BlockPos fanPos, Direction direction, int distance, int a, int b) {
         BlockPos laneStart = offsetPerpendicular(fanPos, direction.getAxis(), a, b);
         for (int step = 1; step < distance; step++) {
             staticNeighbor.set(
-                laneStart.getX() + direction.getOffsetX() * step,
-                laneStart.getY() + direction.getOffsetY() * step,
-                laneStart.getZ() + direction.getOffsetZ() * step
+                    laneStart.getX() + direction.getStepX() * step,
+                    laneStart.getY() + direction.getStepY() * step,
+                    laneStart.getZ() + direction.getStepZ() * step
             );
             if (isSolidObstacle(world, staticNeighbor, world.getBlockState(staticNeighbor))) {
                 return false;
@@ -2007,10 +2043,10 @@ final class ClientL2Solver {
     }
 
     private int sourceFanDirectionCodeForState(BlockState state) {
-        if (state == null || !state.isOf(ModBlocks.FAN_BLOCK)) {
+        if (state == null || !state.is(ModBlocks.FAN_BLOCK)) {
             return 0;
         }
-        Direction direction = state.getOrEmpty(FanBlock.FACING).orElse(Direction.NORTH);
+        Direction direction = state.getOptionalValue(FanBlock.FACING).orElse(Direction.NORTH);
         return switch (direction) {
             case WEST -> 1;
             case EAST -> 2;
@@ -2025,16 +2061,16 @@ final class ClientL2Solver {
         return state == null ? 0.0f : sampleEmitterThermalPowerWatts(state);
     }
 
-    private boolean sourceSolidForState(ClientWorld world, BlockPos pos, BlockState state) {
+    private boolean sourceSolidForState(ClientLevel world, BlockPos pos, BlockState state) {
         return state != null && isSolidObstacle(world, pos, state);
     }
 
     private boolean isFanSurfaceKind(int surfaceKind) {
         return surfaceKind >= Byte.toUnsignedInt(SURFACE_KIND_FAN_X_NEG)
-            && surfaceKind <= Byte.toUnsignedInt(SURFACE_KIND_FAN_Z_POS);
+                && surfaceKind <= Byte.toUnsignedInt(SURFACE_KIND_FAN_Z_POS);
     }
 
-    private float emitterPowerForCell(ClientWorld world, BlockPos pos, BlockState state) {
+    private float emitterPowerForCell(ClientLevel world, BlockPos pos, BlockState state) {
         float directPower = sampleEmitterThermalPowerWatts(state);
         if (directPower > 0.0f) {
             return directPower;
@@ -2053,7 +2089,7 @@ final class ClientL2Solver {
         return coupledPower;
     }
 
-    private boolean heatPathClear(ClientWorld world, int sourceX, int sourceY, int sourceZ, int targetY) {
+    private boolean heatPathClear(ClientLevel world, int sourceX, int sourceY, int sourceZ, int targetY) {
         for (int y = sourceY + 1; y < targetY; y++) {
             staticNeighbor.set(sourceX, y, sourceZ);
             if (isSolidObstacle(world, staticNeighbor, world.getBlockState(staticNeighbor))) {
@@ -2065,34 +2101,34 @@ final class ClientL2Solver {
 
     private float sampleEmitterThermalPowerWatts(BlockState state) {
         float powerWatts = 0.0f;
-        if (state.isOf(Blocks.LAVA) || state.isOf(Blocks.LAVA_CAULDRON)) {
+        if (state.is(Blocks.LAVA) || state.is(Blocks.LAVA_CAULDRON)) {
             powerWatts += THERMAL_EMITTER_POWER_LAVA_W;
         }
-        if (state.isOf(Blocks.MAGMA_BLOCK)) {
+        if (state.is(Blocks.MAGMA_BLOCK)) {
             powerWatts += THERMAL_EMITTER_POWER_MAGMA_W;
         }
-        if (state.isOf(Blocks.CAMPFIRE)) {
-            powerWatts += state.getOrEmpty(Properties.LIT).orElse(false) ? THERMAL_EMITTER_POWER_CAMPFIRE_W : 0.0f;
+        if (state.is(Blocks.CAMPFIRE)) {
+            powerWatts += state.getOptionalValue(BlockStateProperties.LIT).orElse(false) ? THERMAL_EMITTER_POWER_CAMPFIRE_W : 0.0f;
         }
-        if (state.isOf(Blocks.SOUL_CAMPFIRE)) {
-            powerWatts += state.getOrEmpty(Properties.LIT).orElse(false) ? THERMAL_EMITTER_POWER_SOUL_CAMPFIRE_W : 0.0f;
+        if (state.is(Blocks.SOUL_CAMPFIRE)) {
+            powerWatts += state.getOptionalValue(BlockStateProperties.LIT).orElse(false) ? THERMAL_EMITTER_POWER_SOUL_CAMPFIRE_W : 0.0f;
         }
-        if (state.isOf(Blocks.FIRE)) {
+        if (state.is(Blocks.FIRE)) {
             powerWatts += THERMAL_EMITTER_POWER_FIRE_W;
         }
-        if (state.isOf(Blocks.SOUL_FIRE)) {
+        if (state.is(Blocks.SOUL_FIRE)) {
             powerWatts += THERMAL_EMITTER_POWER_SOUL_FIRE_W;
         }
-        if (state.isOf(Blocks.TORCH) || state.isOf(Blocks.WALL_TORCH)) {
+        if (state.is(Blocks.TORCH) || state.is(Blocks.WALL_TORCH)) {
             powerWatts += THERMAL_EMITTER_POWER_TORCH_W;
         }
-        if (state.isOf(Blocks.SOUL_TORCH) || state.isOf(Blocks.SOUL_WALL_TORCH)) {
+        if (state.is(Blocks.SOUL_TORCH) || state.is(Blocks.SOUL_WALL_TORCH)) {
             powerWatts += THERMAL_EMITTER_POWER_SOUL_TORCH_W;
         }
-        if (state.isOf(Blocks.LANTERN)) {
+        if (state.is(Blocks.LANTERN)) {
             powerWatts += THERMAL_EMITTER_POWER_LANTERN_W;
         }
-        if (state.isOf(Blocks.SOUL_LANTERN)) {
+        if (state.is(Blocks.SOUL_LANTERN)) {
             powerWatts += THERMAL_EMITTER_POWER_SOUL_LANTERN_W;
         }
         return Math.max(powerWatts, 0.0f);
@@ -2110,7 +2146,7 @@ final class ClientL2Solver {
                     if (obstacle[cell] != 0) {
                         continue;
                     }
-                    Vec3d pos = new Vec3d(origin.getX() + x + 0.5, origin.getY() + y + 0.5, origin.getZ() + z + 0.5);
+                    Vec3 pos = new Vec3(origin.getX() + x + 0.5, origin.getY() + y + 0.5, origin.getZ() + z + 0.5);
                     AeroWindSample coarse = visualizer.sampleServerCoarseFlow(dimensionId, pos);
                     if (!coarse.hasFlow()) {
                         return null;
@@ -2130,8 +2166,8 @@ final class ClientL2Solver {
         return new CoarseSeedStats(maxCoarseSpeed);
     }
 
-    private boolean isSolidObstacle(ClientWorld world, BlockPos pos, BlockState state) {
-        if (state.isAir() || state.isOf(ModBlocks.DUCT_BLOCK)) {
+    private boolean isSolidObstacle(ClientLevel world, BlockPos pos, BlockState state) {
+        if (state.isAir() || state.is(ModBlocks.DUCT_BLOCK)) {
             return false;
         }
         return !state.getCollisionShape(world, pos).isEmpty();
@@ -2141,7 +2177,7 @@ final class ClientL2Solver {
         if (!(range > 0.0f) || !Float.isFinite(value)) {
             return 0;
         }
-        float normalized = MathHelper.clamp(value / range, -1.0f, 1.0f);
+        float normalized = Mth.clamp(value / range, -1.0f, 1.0f);
         return (short) Math.round(normalized * 32767.0f);
     }
 
@@ -2161,17 +2197,17 @@ final class ClientL2Solver {
 
     private BlockPos brickOrigin(BlockPos pos) {
         return new BlockPos(
-            Math.floorDiv(pos.getX(), BRICK_SIZE) * BRICK_SIZE,
-            Math.floorDiv(pos.getY(), BRICK_SIZE) * BRICK_SIZE,
-            Math.floorDiv(pos.getZ(), BRICK_SIZE) * BRICK_SIZE
+                Math.floorDiv(pos.getX(), BRICK_SIZE) * BRICK_SIZE,
+                Math.floorDiv(pos.getY(), BRICK_SIZE) * BRICK_SIZE,
+                Math.floorDiv(pos.getZ(), BRICK_SIZE) * BRICK_SIZE
         );
     }
 
     private BlockPos brickOrigin(int brickX, int brickY, int brickZ) {
         return new BlockPos(
-            brickX * BRICK_SIZE,
-            brickY * BRICK_SIZE,
-            brickZ * BRICK_SIZE
+                brickX * BRICK_SIZE,
+                brickY * BRICK_SIZE,
+                brickZ * BRICK_SIZE
         );
     }
 
@@ -2191,66 +2227,66 @@ final class ClientL2Solver {
     }
 
     private record StaticCellSample(
-        boolean solid,
-        byte surfaceKind,
-        short openFaceMask,
-        float emitterPowerWatts,
-        byte sourceFanDirection,
-        float sourceEmitterPowerWatts
+            boolean solid,
+            byte surfaceKind,
+            short openFaceMask,
+            float emitterPowerWatts,
+            byte sourceFanDirection,
+            float sourceEmitterPowerWatts
     ) {
     }
 
     private record StaticBrickSnapshot(
-        byte[] obstacle,
-        byte[] surfaceKind,
-        short[] openFaceMask,
-        float[] emitterPower,
-        byte[] sourceFanDirection,
-        float[] sourceEmitterPower
-    ) {
-        static StaticBrickSnapshot copyFrom(
             byte[] obstacle,
             byte[] surfaceKind,
             short[] openFaceMask,
             float[] emitterPower,
             byte[] sourceFanDirection,
             float[] sourceEmitterPower
+    ) {
+        static StaticBrickSnapshot copyFrom(
+                byte[] obstacle,
+                byte[] surfaceKind,
+                short[] openFaceMask,
+                float[] emitterPower,
+                byte[] sourceFanDirection,
+                float[] sourceEmitterPower
         ) {
             return new StaticBrickSnapshot(
-                java.util.Arrays.copyOf(obstacle, obstacle.length),
-                java.util.Arrays.copyOf(surfaceKind, surfaceKind.length),
-                java.util.Arrays.copyOf(openFaceMask, openFaceMask.length),
-                java.util.Arrays.copyOf(emitterPower, emitterPower.length),
-                java.util.Arrays.copyOf(sourceFanDirection, sourceFanDirection.length),
-                java.util.Arrays.copyOf(sourceEmitterPower, sourceEmitterPower.length)
+                    java.util.Arrays.copyOf(obstacle, obstacle.length),
+                    java.util.Arrays.copyOf(surfaceKind, surfaceKind.length),
+                    java.util.Arrays.copyOf(openFaceMask, openFaceMask.length),
+                    java.util.Arrays.copyOf(emitterPower, emitterPower.length),
+                    java.util.Arrays.copyOf(sourceFanDirection, sourceFanDirection.length),
+                    java.util.Arrays.copyOf(sourceEmitterPower, sourceEmitterPower.length)
             );
         }
 
         void copyInto(
-            byte[] outObstacle,
-            byte[] outSurfaceKind,
-            short[] outOpenFaceMask,
-            float[] outEmitterPower,
-            byte[] outSourceFanDirection,
-            float[] outSourceEmitterPower
+                byte[] outObstacle,
+                byte[] outSurfaceKind,
+                short[] outOpenFaceMask,
+                float[] outEmitterPower,
+                byte[] outSourceFanDirection,
+                float[] outSourceEmitterPower
         ) {
             System.arraycopy(obstacle, 0, outObstacle, 0, Math.min(obstacle.length, outObstacle.length));
             System.arraycopy(surfaceKind, 0, outSurfaceKind, 0, Math.min(surfaceKind.length, outSurfaceKind.length));
             System.arraycopy(openFaceMask, 0, outOpenFaceMask, 0, Math.min(openFaceMask.length, outOpenFaceMask.length));
             System.arraycopy(emitterPower, 0, outEmitterPower, 0, Math.min(emitterPower.length, outEmitterPower.length));
             System.arraycopy(
-                sourceFanDirection,
-                0,
-                outSourceFanDirection,
-                0,
-                Math.min(sourceFanDirection.length, outSourceFanDirection.length)
+                    sourceFanDirection,
+                    0,
+                    outSourceFanDirection,
+                    0,
+                    Math.min(sourceFanDirection.length, outSourceFanDirection.length)
             );
             System.arraycopy(
-                sourceEmitterPower,
-                0,
-                outSourceEmitterPower,
-                0,
-                Math.min(sourceEmitterPower.length, outSourceEmitterPower.length)
+                    sourceEmitterPower,
+                    0,
+                    outSourceEmitterPower,
+                    0,
+                    Math.min(sourceEmitterPower.length, outSourceEmitterPower.length)
             );
         }
     }
@@ -2276,37 +2312,38 @@ final class ClientL2Solver {
     private record ActiveHintsCommand(long worldKey, int[] activeHintCoords) implements WorkerCommand {
     }
 
-    private record WorldDeltasCommand(long worldKey, NativeSimulationBridge.WorldDelta[] deltas) implements WorkerCommand {
+    private record WorldDeltasCommand(long worldKey,
+                                      NativeSimulationBridge.WorldDelta[] deltas) implements WorkerCommand {
     }
 
     private record BrickSeedCommand(
-        long worldKey,
-        int brickX,
-        int brickY,
-        int brickZ,
-        byte[] obstacle,
-        byte[] surfaceKind,
-        short[] openFaceMask,
-        float[] emitterPower,
-        byte[] sourceFanDirection,
-        float[] sourceEmitterPower,
-        byte[] faceSkyExposure,
-        byte[] faceDirectExposure,
-        float[] flowState,
-        float[] airTemperature,
-        float[] surfaceTemperature
+            long worldKey,
+            int brickX,
+            int brickY,
+            int brickZ,
+            byte[] obstacle,
+            byte[] surfaceKind,
+            short[] openFaceMask,
+            float[] emitterPower,
+            byte[] sourceFanDirection,
+            float[] sourceEmitterPower,
+            byte[] faceSkyExposure,
+            byte[] faceDirectExposure,
+            float[] flowState,
+            float[] airTemperature,
+            float[] surfaceTemperature
     ) implements WorkerCommand {
     }
 
     private record BoundaryReferenceCommand(
-        long worldKey,
-        int brickX,
-        int brickY,
-        int brickZ,
-        float[] flowState,
-        float[] airTemperature,
-        float[] surfaceTemperature,
-        float maxCoarseSpeedMetersPerSecond
+            long worldKey,
+            int brickX,
+            int brickY,
+            int brickZ,
+            float[] flowState,
+            float[] airTemperature,
+            float[] surfaceTemperature,
+            float maxCoarseSpeedMetersPerSecond
     ) implements WorkerCommand {
     }
 
@@ -2406,16 +2443,16 @@ final class ClientL2Solver {
 
         String status() {
             return "running=" + running
-                + ",queue=" + commands.size()
-                + ",atlases=" + atlases.size()
-                + ",processed=" + processedCommands
-                + ",dropped=" + droppedCommands
-                + ",published=" + publishedAtlases
-                + ",lastStepMs=" + formatMillis(lastStepNanos)
-                + ",lastPublishMs=" + formatMillis(lastPublishNanos)
-                + ",native=" + formatNativeStatus(lastNativeStatus)
-                + ",runtime=" + lastRuntimeInfo
-                + ",error=" + lastError;
+                    + ",queue=" + commands.size()
+                    + ",atlases=" + atlases.size()
+                    + ",processed=" + processedCommands
+                    + ",dropped=" + droppedCommands
+                    + ",published=" + publishedAtlases
+                    + ",lastStepMs=" + formatMillis(lastStepNanos)
+                    + ",lastPublishMs=" + formatMillis(lastPublishNanos)
+                    + ",native=" + formatNativeStatus(lastNativeStatus)
+                    + ",runtime=" + lastRuntimeInfo
+                    + ",error=" + lastError;
         }
 
         private void offer(WorkerCommand command) {
@@ -2446,19 +2483,19 @@ final class ClientL2Solver {
 
         private boolean isPriorityCommand(WorkerCommand command) {
             return command instanceof ActiveHintsCommand
-                || command instanceof WorldDeltasCommand
-                || command instanceof BrickSeedCommand
-                || command instanceof BoundaryReferenceCommand
-                || command instanceof ResetCommand
-                || command instanceof CloseCommand;
+                    || command instanceof WorldDeltasCommand
+                    || command instanceof BrickSeedCommand
+                    || command instanceof BoundaryReferenceCommand
+                    || command instanceof ResetCommand
+                    || command instanceof CloseCommand;
         }
 
         private WorldDeltasCommand coalesceQueuedWorldDeltas(WorldDeltasCommand incoming) {
             java.util.ArrayList<NativeSimulationBridge.WorldDelta> merged = new java.util.ArrayList<>(incoming.deltas().length);
             for (WorkerCommand queued : commands.toArray(new WorkerCommand[0])) {
                 if (queued instanceof WorldDeltasCommand existing
-                    && existing.worldKey() == incoming.worldKey()
-                    && commands.remove(queued)) {
+                        && existing.worldKey() == incoming.worldKey()
+                        && commands.remove(queued)) {
                     java.util.Collections.addAll(merged, existing.deltas());
                 }
             }
@@ -2467,7 +2504,7 @@ final class ClientL2Solver {
         }
 
         private NativeSimulationBridge.WorldDelta[] coalesceWorldDeltas(
-            java.util.List<NativeSimulationBridge.WorldDelta> deltas
+                java.util.List<NativeSimulationBridge.WorldDelta> deltas
         ) {
             java.util.LinkedHashMap<WorkerDeltaKey, NativeSimulationBridge.WorldDelta> byCell = new java.util.LinkedHashMap<>();
             for (NativeSimulationBridge.WorldDelta delta : deltas) {
@@ -2479,22 +2516,22 @@ final class ClientL2Solver {
                 }
                 if (delta.type() == NativeSimulationBridge.WORLD_DELTA_BRICK_STATIC_SOURCE_PATCH) {
                     int packedState = (existing.data1() & 0x000001)
-                        | (delta.data1() & 0x000002)
-                        | (existing.data1() & 0x00FF00)
-                        | (delta.data1() & 0xFF0000);
+                            | (delta.data1() & 0x000002)
+                            | (existing.data1() & 0x00FF00)
+                            | (delta.data1() & 0xFF0000);
                     byCell.put(key, new NativeSimulationBridge.WorldDelta(
-                        delta.type(),
-                        delta.x(),
-                        delta.y(),
-                        delta.z(),
-                        delta.data0(),
-                        packedState,
-                        delta.data2(),
-                        delta.data3(),
-                        existing.value0(),
-                        delta.value1(),
-                        delta.value2(),
-                        delta.value3()
+                            delta.type(),
+                            delta.x(),
+                            delta.y(),
+                            delta.z(),
+                            delta.data0(),
+                            packedState,
+                            delta.data2(),
+                            delta.data3(),
+                            existing.value0(),
+                            delta.value1(),
+                            delta.value2(),
+                            delta.value3()
                     ));
                 } else {
                     byCell.put(key, delta);
@@ -2620,48 +2657,48 @@ final class ClientL2Solver {
                 return;
             }
             if (!bridge.uploadBrickWorldStaticBrickWithSources(
-                serviceKey,
-                command.worldKey(),
-                BRICK_SIZE,
-                command.brickX(),
-                command.brickY(),
-                command.brickZ(),
-                command.obstacle(),
-                command.surfaceKind(),
-                command.openFaceMask(),
-                command.emitterPower(),
-                command.sourceFanDirection(),
-                command.sourceEmitterPower(),
-                command.faceSkyExposure(),
-                command.faceDirectExposure()
+                    serviceKey,
+                    command.worldKey(),
+                    BRICK_SIZE,
+                    command.brickX(),
+                    command.brickY(),
+                    command.brickZ(),
+                    command.obstacle(),
+                    command.surfaceKind(),
+                    command.openFaceMask(),
+                    command.emitterPower(),
+                    command.sourceFanDirection(),
+                    command.sourceEmitterPower(),
+                    command.faceSkyExposure(),
+                    command.faceDirectExposure()
             )) {
                 lastError = "uploadBrickWorldStaticBrick failed: " + bridge.lastError();
                 return;
             }
             if (!bridge.uploadBrickWorldDynamicBrick(
-                serviceKey,
-                command.worldKey(),
-                BRICK_SIZE,
-                command.brickX(),
-                command.brickY(),
-                command.brickZ(),
-                command.flowState(),
-                command.airTemperature(),
-                command.surfaceTemperature()
+                    serviceKey,
+                    command.worldKey(),
+                    BRICK_SIZE,
+                    command.brickX(),
+                    command.brickY(),
+                    command.brickZ(),
+                    command.flowState(),
+                    command.airTemperature(),
+                    command.surfaceTemperature()
             )) {
                 lastError = "uploadBrickWorldDynamicBrick failed: " + bridge.lastError();
                 return;
             }
             if (!bridge.uploadBrickWorldBoundaryReferenceBrick(
-                serviceKey,
-                command.worldKey(),
-                BRICK_SIZE,
-                command.brickX(),
-                command.brickY(),
-                command.brickZ(),
-                command.flowState(),
-                command.airTemperature(),
-                command.surfaceTemperature()
+                    serviceKey,
+                    command.worldKey(),
+                    BRICK_SIZE,
+                    command.brickX(),
+                    command.brickY(),
+                    command.brickZ(),
+                    command.flowState(),
+                    command.airTemperature(),
+                    command.surfaceTemperature()
             )) {
                 lastError = "uploadBrickWorldBoundaryReferenceBrick failed: " + bridge.lastError();
                 return;
@@ -2674,22 +2711,6 @@ final class ClientL2Solver {
                 return;
             }
             if (!bridge.uploadBrickWorldBoundaryReferenceBrick(
-                serviceKey,
-                command.worldKey(),
-                BRICK_SIZE,
-                command.brickX(),
-                command.brickY(),
-                command.brickZ(),
-                command.flowState(),
-                command.airTemperature(),
-                command.surfaceTemperature()
-            )) {
-                lastError = "boundary reference refresh failed: " + bridge.lastError();
-                return;
-            }
-            if (command.maxCoarseSpeedMetersPerSecond() >= COARSE_RESEED_MIN_SPEED_MPS
-                && shouldReseedZeroDynamicBrick(command)) {
-                bridge.uploadBrickWorldDynamicBrick(
                     serviceKey,
                     command.worldKey(),
                     BRICK_SIZE,
@@ -2699,6 +2720,22 @@ final class ClientL2Solver {
                     command.flowState(),
                     command.airTemperature(),
                     command.surfaceTemperature()
+            )) {
+                lastError = "boundary reference refresh failed: " + bridge.lastError();
+                return;
+            }
+            if (command.maxCoarseSpeedMetersPerSecond() >= COARSE_RESEED_MIN_SPEED_MPS
+                    && shouldReseedZeroDynamicBrick(command)) {
+                bridge.uploadBrickWorldDynamicBrick(
+                        serviceKey,
+                        command.worldKey(),
+                        BRICK_SIZE,
+                        command.brickX(),
+                        command.brickY(),
+                        command.brickZ(),
+                        command.flowState(),
+                        command.airTemperature(),
+                        command.surfaceTemperature()
                 );
             }
             updateNativeStatus(command.worldKey());
@@ -2706,15 +2743,15 @@ final class ClientL2Solver {
 
         private boolean shouldReseedZeroDynamicBrick(BoundaryReferenceCommand command) {
             if (!bridge.copyBrickWorldDynamicBrick(
-                serviceKey,
-                command.worldKey(),
-                BRICK_SIZE,
-                command.brickX(),
-                command.brickY(),
-                command.brickZ(),
-                workerFlowState,
-                workerAirTemperature,
-                workerSurfaceTemperature
+                    serviceKey,
+                    command.worldKey(),
+                    BRICK_SIZE,
+                    command.brickX(),
+                    command.brickY(),
+                    command.brickZ(),
+                    workerFlowState,
+                    workerAirTemperature,
+                    workerSurfaceTemperature
             )) {
                 return true;
             }
@@ -2743,25 +2780,25 @@ final class ClientL2Solver {
                 int sampleStride = LOCAL_PUBLISH_SAMPLE_STRIDE;
                 short[] packedFlow = new short[packedValueCount(BRICK_SIZE, sampleStride)];
                 if (!bridge.copyBrickWorldPackedFlowAtlas(
-                    serviceKey,
-                    worldKey,
-                    BRICK_SIZE,
-                    target.brickX(),
-                    target.brickY(),
-                    target.brickZ(),
-                    sampleStride,
-                    packedFlow
-                )) {
-                    if (!bridge.copyBrickWorldDynamicBrick(
                         serviceKey,
                         worldKey,
                         BRICK_SIZE,
                         target.brickX(),
                         target.brickY(),
                         target.brickZ(),
-                        workerFlowState,
-                        workerAirTemperature,
-                        workerSurfaceTemperature
+                        sampleStride,
+                        packedFlow
+                )) {
+                    if (!bridge.copyBrickWorldDynamicBrick(
+                            serviceKey,
+                            worldKey,
+                            BRICK_SIZE,
+                            target.brickX(),
+                            target.brickY(),
+                            target.brickZ(),
+                            workerFlowState,
+                            workerAirTemperature,
+                            workerSurfaceTemperature
                     )) {
                         lastError = "copyBrickWorldDynamicBrick failed: " + bridge.lastError();
                         continue;
@@ -2790,16 +2827,16 @@ final class ClientL2Solver {
                         int gz = Math.min(BRICK_SIZE - 1, z * sampleStride);
                         int srcBase = cellIndex(gx, gy, gz) * FLOW_CHANNELS;
                         packedFlow[dstBase] = quantizeSignedToShort(
-                            workerFlowState[srcBase] * NATIVE_VELOCITY_SCALE,
-                            ATLAS_VELOCITY_RANGE
+                                workerFlowState[srcBase] * NATIVE_VELOCITY_SCALE,
+                                ATLAS_VELOCITY_RANGE
                         );
                         packedFlow[dstBase + 1] = quantizeSignedToShort(
-                            workerFlowState[srcBase + 1] * NATIVE_VELOCITY_SCALE,
-                            ATLAS_VELOCITY_RANGE
+                                workerFlowState[srcBase + 1] * NATIVE_VELOCITY_SCALE,
+                                ATLAS_VELOCITY_RANGE
                         );
                         packedFlow[dstBase + 2] = quantizeSignedToShort(
-                            workerFlowState[srcBase + 2] * NATIVE_VELOCITY_SCALE,
-                            ATLAS_VELOCITY_RANGE
+                                workerFlowState[srcBase + 2] * NATIVE_VELOCITY_SCALE,
+                                ATLAS_VELOCITY_RANGE
                         );
                         packedFlow[dstBase + 3] = quantizeSignedToShort(workerFlowState[srcBase + 3], ATLAS_PRESSURE_RANGE);
                         dstBase += PACKED_CHANNELS;
@@ -2918,15 +2955,15 @@ final class ClientL2Solver {
 
     String stressStatus() {
         return stressMode.name().toLowerCase(java.util.Locale.ROOT)
-            + ":ticks=" + stressSubmittedTicks
-            + ":patches=" + stressSubmittedPatches
-            + ":fan=" + stressSubmittedFanCells
-            + ":heat=" + stressSubmittedHeatCells
-            + ":dirty=" + stressSubmittedDirtyCells
-            + ":staticSubmitted=" + stressStaticSubmittedForActiveSet
-            + ":patchesPerTick=" + STRESS_PATCHES_PER_TICK
-            + ":interval=" + STRESS_INTERVAL_TICKS
-            + ":queueLimit=" + STRESS_QUEUE_BACKLOG_LIMIT;
+                + ":ticks=" + stressSubmittedTicks
+                + ":patches=" + stressSubmittedPatches
+                + ":fan=" + stressSubmittedFanCells
+                + ":heat=" + stressSubmittedHeatCells
+                + ":dirty=" + stressSubmittedDirtyCells
+                + ":staticSubmitted=" + stressStaticSubmittedForActiveSet
+                + ":patchesPerTick=" + STRESS_PATCHES_PER_TICK
+                + ":interval=" + STRESS_INTERVAL_TICKS
+                + ":queueLimit=" + STRESS_QUEUE_BACKLOG_LIMIT;
     }
 
     private String formatNativeStatus(NativeSimulationBridge.BrickWorldRuntimeStatus status) {
@@ -2934,12 +2971,12 @@ final class ClientL2Solver {
             return "none";
         }
         return "known=" + status.knownBrickCount()
-            + ",hints=" + status.activeHintCount()
-            + ",active=" + status.activeBrickCount()
-            + ",dirty=" + status.geometryDirtyCount()
-            + ",forcingDirty=" + status.forcingDirtyCount()
-            + ",reinit=" + status.pendingReinitCount()
-            + ",epoch=" + status.epoch();
+                + ",hints=" + status.activeHintCount()
+                + ",active=" + status.activeBrickCount()
+                + ",dirty=" + status.geometryDirtyCount()
+                + ",forcingDirty=" + status.forcingDirtyCount()
+                + ",reinit=" + status.pendingReinitCount()
+                + ",epoch=" + status.epoch();
     }
 
     private static String formatMillis(long nanos) {
@@ -2951,10 +2988,10 @@ final class ClientL2Solver {
             return "idle";
         }
         return stagedBrickX + "," + stagedBrickY + "," + stagedBrickZ
-            + ":static=" + stagedStaticCursor + "/" + CELL_COUNT
-            + ":seed=" + stagedSeedCursor + "/" + CELL_COUNT
-            + ":staticUploaded=" + stagedStaticUploaded
-            + ":dynamicUploaded=" + stagedDynamicUploaded;
+                + ":static=" + stagedStaticCursor + "/" + CELL_COUNT
+                + ":seed=" + stagedSeedCursor + "/" + CELL_COUNT
+                + ":staticUploaded=" + stagedStaticUploaded
+                + ":dynamicUploaded=" + stagedDynamicUploaded;
     }
 
     private String boundaryReferenceRefreshStatus() {
@@ -2962,8 +2999,8 @@ final class ClientL2Solver {
             return "idle";
         }
         return boundaryRefreshBrickX + "," + boundaryRefreshBrickY + "," + boundaryRefreshBrickZ
-            + ":cells=" + boundaryRefreshCursor + "/" + CELL_COUNT
-            + ":maxCoarse=" + String.format("%.3f", boundaryRefreshMaxCoarseSpeed);
+                + ":cells=" + boundaryRefreshCursor + "/" + CELL_COUNT
+                + ":maxCoarse=" + String.format("%.3f", boundaryRefreshMaxCoarseSpeed);
     }
 
     void setExperimentalEnabled(boolean enabled) {
@@ -2988,17 +3025,17 @@ final class ClientL2Solver {
         return experimentalEnabled;
     }
 
-    private void disableClientSolve(MinecraftClient client, String reason) {
+    private void disableClientSolve(Minecraft client, String reason) {
         clientSolveDisabled = true;
         resetActiveBrick();
         maybeLog(client, "disabled client L2: " + reason);
     }
 
-    private void maybeLog(MinecraftClient client, String message) {
-        if (client.world == null) {
+    private void maybeLog(Minecraft client, String message) {
+        if (client.level == null) {
             return;
         }
-        long now = client.world.getTime();
+        long now = client.level.getGameTime();
         if (lastDiagnosticGameTime == Long.MIN_VALUE || now - lastDiagnosticGameTime >= 100) {
             LOGGER.info("Client L2 idle: {}", message);
             lastDiagnosticGameTime = now;

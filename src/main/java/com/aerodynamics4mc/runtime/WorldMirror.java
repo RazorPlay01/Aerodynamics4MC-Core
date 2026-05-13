@@ -1,30 +1,22 @@
 package com.aerodynamics4mc.runtime;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 import com.aerodynamics4mc.FanBlock;
 import com.aerodynamics4mc.FanBlockEntity;
 import com.aerodynamics4mc.ModBlocks;
-
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 final class WorldMirror {
     static final int SECTION_SIZE = 16;
@@ -37,7 +29,7 @@ final class WorldMirror {
 
     @FunctionalInterface
     interface SectionBuilder {
-        void build(ServerWorld world, BlockPos sectionOrigin, SectionSnapshot snapshot);
+        void build(ServerLevel world, BlockPos sectionOrigin, SectionSnapshot snapshot);
     }
 
     static final class SectionSnapshot {
@@ -97,7 +89,7 @@ final class WorldMirror {
         private final int ductLength;
 
         FanRecord(BlockPos pos, Direction facing, int ductLength) {
-            this.pos = pos.toImmutable();
+            this.pos = pos.immutable();
             this.facing = facing;
             this.ductLength = ductLength;
         }
@@ -126,10 +118,10 @@ final class WorldMirror {
         private long generation;
     }
 
-    private record BuildRequest(RegistryKey<World> worldKey, BlockPos sectionOrigin) {
+    private record BuildRequest(ResourceKey<Level> worldKey, BlockPos sectionOrigin) {
     }
 
-    private record FanRefreshRequest(RegistryKey<World> worldKey, BlockPos fanPos) {
+    private record FanRefreshRequest(ResourceKey<Level> worldKey, BlockPos fanPos) {
     }
 
     private static final class DimensionMirror {
@@ -137,7 +129,7 @@ final class WorldMirror {
         private final Map<Long, FanRecord> fans = new HashMap<>();
     }
 
-    private final Map<RegistryKey<World>, DimensionMirror> dimensions = new HashMap<>();
+    private final Map<ResourceKey<Level>, DimensionMirror> dimensions = new HashMap<>();
     private final StaticStore staticStore = new StaticStore();
     private final ExecutorService loadExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "aero-static-load");
@@ -159,22 +151,22 @@ final class WorldMirror {
         queuedFanRefreshes.clear();
     }
 
-    synchronized void onWorldUnload(ServerWorld world) {
-        dimensions.remove(world.getRegistryKey());
+    synchronized void onLevelUnload(ServerLevel world) {
+        dimensions.remove(world.dimension());
     }
 
-    synchronized void onChunkLoad(ServerWorld world, WorldChunk chunk) {
-        DimensionMirror dimension = dimension(world.getRegistryKey());
+    synchronized void onChunkLoad(ServerLevel world, LevelChunk chunk) {
+        DimensionMirror dimension = dimension(world.dimension());
         int sectionX = chunk.getPos().x * SECTION_SIZE;
         int sectionZ = chunk.getPos().z * SECTION_SIZE;
-        for (int sectionY = world.getBottomSectionCoord(); sectionY < world.getTopSectionCoord(); sectionY++) {
-            markSectionDirty(dimension, sectionX, sectionY * SECTION_SIZE, sectionZ, true, false, world, world.getRegistryKey());
+        for (int sectionY = world.getMinSectionY(); sectionY < world.getMaxSectionY(); sectionY++) {
+            markSectionDirty(dimension, sectionX, sectionY * SECTION_SIZE, sectionZ, true, false, world, world.dimension());
         }
         refreshChunkFans(world, dimension, chunk);
     }
 
-    synchronized void onChunkUnload(ServerWorld world, ChunkPos chunkPos) {
-        DimensionMirror dimension = dimensions.get(world.getRegistryKey());
+    synchronized void onChunkUnload(ServerLevel world, ChunkPos chunkPos) {
+        DimensionMirror dimension = dimensions.get(world.dimension());
         if (dimension == null) {
             return;
         }
@@ -185,7 +177,7 @@ final class WorldMirror {
         Iterator<Map.Entry<Long, SectionEntry>> sectionIt = dimension.sections.entrySet().iterator();
         while (sectionIt.hasNext()) {
             long packed = sectionIt.next().getKey();
-            BlockPos origin = BlockPos.fromLong(packed);
+            BlockPos origin = BlockPos.of(packed);
             if (origin.getX() >= minX && origin.getX() < maxX && origin.getZ() >= minZ && origin.getZ() < maxZ) {
                 sectionIt.remove();
             }
@@ -200,20 +192,20 @@ final class WorldMirror {
         }
     }
 
-    synchronized void onBlockEntityLoad(BlockEntity blockEntity, ServerWorld world) {
+    synchronized void onBlockEntityLoad(BlockEntity blockEntity, ServerLevel world) {
         if (blockEntity instanceof FanBlockEntity) {
-            upsertFan(world, blockEntity.getPos(), blockEntity.getCachedState());
+            upsertFan(world, blockEntity.getBlockPos(), blockEntity.getBlockState());
         }
     }
 
-    synchronized void onBlockEntityUnload(BlockEntity blockEntity, ServerWorld world) {
+    synchronized void onBlockEntityUnload(BlockEntity blockEntity, ServerLevel world) {
         if (blockEntity instanceof FanBlockEntity) {
-            removeFan(world, blockEntity.getPos());
+            removeFan(world, blockEntity.getBlockPos());
         }
     }
 
-    synchronized void onBlockChanged(ServerWorld world, BlockPos pos, BlockState oldState, BlockState newState) {
-        DimensionMirror dimension = dimension(world.getRegistryKey());
+    synchronized void onBlockChanged(ServerLevel world, BlockPos pos, BlockState oldState, BlockState newState) {
+        DimensionMirror dimension = dimension(world.dimension());
         markDirtyForBlockChange(world, dimension, pos);
         if (isFanState(oldState) || isFanState(newState)) {
             if (isFanState(newState)) {
@@ -222,13 +214,13 @@ final class WorldMirror {
                 removeFan(world, pos);
             }
         } else if (isDuctState(oldState) || isDuctState(newState)) {
-            queueNearbyFanDuctRefreshes(world.getRegistryKey(), dimension, pos);
+            queueNearbyFanDuctRefreshes(world.dimension(), dimension, pos);
         }
     }
 
     synchronized void requestSectionBuild(
         MinecraftServer server,
-        RegistryKey<World> worldKey,
+        ResourceKey<Level> worldKey,
         BlockPos sectionOrigin,
         boolean highPriority
     ) {
@@ -256,7 +248,7 @@ final class WorldMirror {
                     }
                 }
             }
-            ServerWorld world = server.getWorld(request.worldKey());
+            ServerLevel world = server.getLevel(request.worldKey());
             if (world == null) {
                 continue;
             }
@@ -296,7 +288,7 @@ final class WorldMirror {
                     }
                 }
             }
-            ServerWorld world = server.getWorld(request.worldKey());
+            ServerLevel world = server.getLevel(request.worldKey());
             if (world == null) {
                 continue;
             }
@@ -331,7 +323,7 @@ final class WorldMirror {
                 }
                 queuedFanRefreshes.remove(request);
             }
-            ServerWorld world = server.getWorld(request.worldKey());
+            ServerLevel world = server.getLevel(request.worldKey());
             if (world == null) {
                 continue;
             }
@@ -363,7 +355,7 @@ final class WorldMirror {
         }
     }
 
-    synchronized SectionSnapshot peekSection(RegistryKey<World> worldKey, BlockPos sectionOrigin) {
+    synchronized SectionSnapshot peekSection(ResourceKey<Level> worldKey, BlockPos sectionOrigin) {
         DimensionMirror dimension = dimensions.get(worldKey);
         if (dimension == null) {
             return null;
@@ -376,7 +368,7 @@ final class WorldMirror {
         return entry.snapshot;
     }
 
-    synchronized List<FanRecord> queryFans(RegistryKey<World> worldKey, BlockPos origin, int gridSize, int margin) {
+    synchronized List<FanRecord> queryFans(ResourceKey<Level> worldKey, BlockPos origin, int gridSize, int margin) {
         DimensionMirror dimension = dimensions.get(worldKey);
         if (dimension == null || dimension.fans.isEmpty()) {
             return List.of();
@@ -399,7 +391,7 @@ final class WorldMirror {
         return result;
     }
 
-    private void refreshChunkFans(ServerWorld world, DimensionMirror dimension, WorldChunk chunk) {
+    private void refreshChunkFans(ServerLevel world, DimensionMirror dimension, LevelChunk chunk) {
         ChunkPos chunkPos = chunk.getPos();
         Iterator<Map.Entry<Long, FanRecord>> it = dimension.fans.entrySet().iterator();
         while (it.hasNext()) {
@@ -410,44 +402,44 @@ final class WorldMirror {
             }
         }
         for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-            if (blockEntity instanceof FanBlockEntity && blockEntity.getCachedState().isOf(ModBlocks.FAN_BLOCK)) {
-                BlockState state = blockEntity.getCachedState();
-                Direction facing = state.get(FanBlock.FACING);
+            if (blockEntity instanceof FanBlockEntity && blockEntity.getBlockState().is(ModBlocks.FAN_BLOCK)) {
+                BlockState state = blockEntity.getBlockState();
+                Direction facing = state.getValue(FanBlock.FACING);
                 dimension.fans.put(
-                    blockEntity.getPos().asLong(),
-                    new FanRecord(blockEntity.getPos(), facing, computeDuctLength(world, blockEntity.getPos(), facing))
+                    blockEntity.getBlockPos().asLong(),
+                    new FanRecord(blockEntity.getBlockPos(), facing, computeDuctLength(world, blockEntity.getBlockPos(), facing))
                 );
             }
         }
     }
 
-    private void upsertFan(ServerWorld world, BlockPos pos, BlockState state) {
+    private void upsertFan(ServerLevel world, BlockPos pos, BlockState state) {
         if (!isFanState(state)) {
             return;
         }
-        Direction facing = state.get(FanBlock.FACING);
-        dimension(world.getRegistryKey()).fans.put(
+        Direction facing = state.getValue(FanBlock.FACING);
+        dimension(world.dimension()).fans.put(
             pos.asLong(),
             new FanRecord(pos, facing, computeDuctLength(world, pos, facing))
         );
     }
 
-    private void removeFan(ServerWorld world, BlockPos pos) {
-        DimensionMirror dimension = dimensions.get(world.getRegistryKey());
+    private void removeFan(ServerLevel world, BlockPos pos) {
+        DimensionMirror dimension = dimensions.get(world.dimension());
         if (dimension != null) {
             dimension.fans.remove(pos.asLong());
         }
     }
 
     private boolean isFanState(BlockState state) {
-        return state != null && state.isOf(ModBlocks.FAN_BLOCK);
+        return state != null && state.is(ModBlocks.FAN_BLOCK);
     }
 
     private boolean isDuctState(BlockState state) {
-        return state != null && state.isOf(ModBlocks.DUCT_BLOCK);
+        return state != null && state.is(ModBlocks.DUCT_BLOCK);
     }
 
-    private void queueNearbyFanDuctRefreshes(RegistryKey<World> worldKey, DimensionMirror dimension, BlockPos changedPos) {
+    private void queueNearbyFanDuctRefreshes(ResourceKey<Level> worldKey, DimensionMirror dimension, BlockPos changedPos) {
         if (dimension.fans.isEmpty()) {
             return;
         }
@@ -459,8 +451,8 @@ final class WorldMirror {
         }
     }
 
-    private void queueFanRefreshLocked(RegistryKey<World> worldKey, BlockPos fanPos) {
-        FanRefreshRequest request = new FanRefreshRequest(worldKey, fanPos.toImmutable());
+    private void queueFanRefreshLocked(ResourceKey<Level> worldKey, BlockPos fanPos) {
+        FanRefreshRequest request = new FanRefreshRequest(worldKey, fanPos.immutable());
         if (!queuedFanRefreshes.add(request)) {
             return;
         }
@@ -473,17 +465,17 @@ final class WorldMirror {
             && Math.abs(fanPos.getZ() - changedPos.getZ()) <= DUCT_SCAN_MAX + DUCT_RING_RADIUS + 1;
     }
 
-    private int computeDuctLength(ServerWorld world, BlockPos fanPos, Direction facing) {
+    private int computeDuctLength(ServerLevel world, BlockPos fanPos, Direction facing) {
         int runLength = 0;
         int maxRunLength = 0;
         int consecutiveGaps = 0;
-        BlockPos.Mutable cursor = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
         for (int step = 1; step <= DUCT_SCAN_MAX; step++) {
             cursor.set(
-                fanPos.getX() + facing.getOffsetX() * step,
-                fanPos.getY() + facing.getOffsetY() * step,
-                fanPos.getZ() + facing.getOffsetZ() * step
+                fanPos.getX() + facing.getStepX() * step,
+                fanPos.getY() + facing.getStepY() * step,
+                fanPos.getZ() + facing.getStepZ() * step
             );
             if (isDuctSegment(world, cursor, facing)) {
                 runLength++;
@@ -499,14 +491,14 @@ final class WorldMirror {
         return maxRunLength;
     }
 
-    private boolean isDuctSegment(ServerWorld world, BlockPos center, Direction facing) {
+    private boolean isDuctSegment(ServerLevel world, BlockPos center, Direction facing) {
         if (isSolidObstacle(world, center)) {
             return false;
         }
 
         int ringCells = 0;
         int filledRingCells = 0;
-        BlockPos.Mutable cursor = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         Direction.Axis axis = facing.getAxis();
         for (int a = -DUCT_RING_RADIUS; a <= DUCT_RING_RADIUS; a++) {
             for (int b = -DUCT_RING_RADIUS; b <= DUCT_RING_RADIUS; b++) {
@@ -519,7 +511,7 @@ final class WorldMirror {
                     case Y -> cursor.set(center.getX() + a, center.getY(), center.getZ() + b);
                     case Z -> cursor.set(center.getX() + a, center.getY() + b, center.getZ());
                 }
-                if (world.getBlockState(cursor).isOf(ModBlocks.DUCT_BLOCK)) {
+                if (world.getBlockState(cursor).is(ModBlocks.DUCT_BLOCK)) {
                     filledRingCells++;
                 }
             }
@@ -535,15 +527,15 @@ final class WorldMirror {
         return Math.max(Math.abs(a), Math.abs(b)) == DUCT_RING_RADIUS;
     }
 
-    private boolean isSolidObstacle(ServerWorld world, BlockPos pos) {
+    private boolean isSolidObstacle(ServerLevel world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
-        if (state.isAir() || state.isOf(ModBlocks.DUCT_BLOCK)) {
+        if (state.isAir() || state.is(ModBlocks.DUCT_BLOCK)) {
             return false;
         }
         return !state.getCollisionShape(world, pos).isEmpty();
     }
 
-    private void markDirtyForBlockChange(ServerWorld world, DimensionMirror dimension, BlockPos pos) {
+    private void markDirtyForBlockChange(ServerLevel world, DimensionMirror dimension, BlockPos pos) {
         BlockPos aligned = alignSectionOrigin(pos);
         int baseX = aligned.getX();
         int baseY = aligned.getY();
@@ -556,7 +548,7 @@ final class WorldMirror {
             false,
             true,
             world,
-            world.getRegistryKey()
+            world.dimension()
         );
 
         int localX = Math.floorMod(pos.getX(), SECTION_SIZE);
@@ -572,7 +564,7 @@ final class WorldMirror {
                 false,
                 true,
                 world,
-                world.getRegistryKey()
+                world.dimension()
             );
         } else if (localX == SECTION_SIZE - 1) {
             markSectionDirty(
@@ -583,7 +575,7 @@ final class WorldMirror {
                 false,
                 true,
                 world,
-                world.getRegistryKey()
+                world.dimension()
             );
         }
 
@@ -596,7 +588,7 @@ final class WorldMirror {
                 false,
                 true,
                 world,
-                world.getRegistryKey()
+                world.dimension()
             );
         } else if (localY == SECTION_SIZE - 1) {
             markSectionDirty(
@@ -607,7 +599,7 @@ final class WorldMirror {
                 false,
                 true,
                 world,
-                world.getRegistryKey()
+                world.dimension()
             );
         }
 
@@ -620,7 +612,7 @@ final class WorldMirror {
                 false,
                 true,
                 world,
-                world.getRegistryKey()
+                world.dimension()
             );
         } else if (localZ == SECTION_SIZE - 1) {
             markSectionDirty(
@@ -631,7 +623,7 @@ final class WorldMirror {
                 false,
                 true,
                 world,
-                world.getRegistryKey()
+                world.dimension()
             );
         }
     }
@@ -643,8 +635,8 @@ final class WorldMirror {
         int originZ,
         boolean storeLoadEligible,
         boolean invalidateStoredSnapshot,
-        ServerWorld world,
-        RegistryKey<World> worldKey
+        ServerLevel world,
+        ResourceKey<Level> worldKey
     ) {
         long key = new BlockPos(originX, originY, originZ).asLong();
         SectionEntry entry = dimension.sections.computeIfAbsent(key, ignored -> new SectionEntry());
@@ -658,7 +650,7 @@ final class WorldMirror {
 
     private void requestSectionBuildLocked(
         MinecraftServer server,
-        RegistryKey<World> worldKey,
+        ResourceKey<Level> worldKey,
         BlockPos alignedOrigin,
         SectionEntry entry,
         boolean highPriority
@@ -686,7 +678,7 @@ final class WorldMirror {
 
     private void loadSectionFromStore(
         MinecraftServer server,
-        RegistryKey<World> worldKey,
+        ResourceKey<Level> worldKey,
         BlockPos alignedOrigin,
         long generation
     ) {
@@ -723,7 +715,7 @@ final class WorldMirror {
     }
 
     private void queueLiveBuildLocked(
-        RegistryKey<World> worldKey,
+        ResourceKey<Level> worldKey,
         BlockPos alignedOrigin,
         SectionEntry entry,
         boolean highPriority
@@ -759,7 +751,7 @@ final class WorldMirror {
         target.setVersion(source.version());
     }
 
-    private DimensionMirror dimension(RegistryKey<World> worldKey) {
+    private DimensionMirror dimension(ResourceKey<Level> worldKey) {
         return dimensions.computeIfAbsent(worldKey, ignored -> new DimensionMirror());
     }
 

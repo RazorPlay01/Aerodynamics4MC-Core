@@ -1,144 +1,138 @@
 package com.aerodynamics4mc;
 
-import java.util.Locale;
-
 import com.aerodynamics4mc.api.GameplayWindSample;
 import com.mojang.serialization.MapCodec;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockRenderType;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.BlockWithEntity;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.BlockView;
-import net.minecraft.world.World;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import org.jspecify.annotations.Nullable;
 
-public class WindTurbineProbeBlock extends BlockWithEntity {
-    public static final MapCodec<WindTurbineProbeBlock> CODEC = createCodec(WindTurbineProbeBlock::new);
+import java.util.Locale;
 
-    public WindTurbineProbeBlock(Settings settings) {
-        super(settings);
+public class WindTurbineProbeBlock extends BaseEntityBlock {
+    public static final MapCodec<WindTurbineProbeBlock> CODEC = simpleCodec(WindTurbineProbeBlock::new);
+
+    protected WindTurbineProbeBlock(Properties properties) {
+        super(properties);
     }
 
     @Override
-    protected MapCodec<? extends BlockWithEntity> getCodec() {
+    protected MapCodec<? extends BaseEntityBlock> codec() {
         return CODEC;
     }
 
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
-        return new WindTurbineProbeBlockEntity(pos, state);
+    public @Nullable BlockEntity newBlockEntity(BlockPos blockPos, BlockState blockState) {
+        return new WindTurbineProbeBlockEntity(blockPos, blockState);
     }
 
     @Override
-    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
-        if (world.isClient()) {
+    public @Nullable <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState blockState, BlockEntityType<T> blockEntityType) {
+        if (level.isClientSide()) {
             return null;
         }
-        return validateTicker(type, ModBlocks.WIND_TURBINE_PROBE_BLOCK_ENTITY, WindTurbineProbeBlockEntity::tick);
+        return createTickerHelper(blockEntityType, ModBlocks.WIND_TURBINE_PROBE_BLOCK_ENTITY, WindTurbineProbeBlockEntity::tick);
     }
 
     @Override
-    protected BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.MODEL;
+    protected RenderShape getRenderShape(BlockState blockState) {
+        return RenderShape.MODEL;
+    }
+
+
+    @Override
+    protected InteractionResult useWithoutItem(BlockState blockState, Level level, BlockPos blockPos, Player player, BlockHitResult blockHitResult) {
+        return showStatus(blockState, level, blockPos, player);
+    }
+
+
+    @Override
+    protected InteractionResult useItemOn(ItemStack itemStack, BlockState blockState, Level level, BlockPos blockPos, Player player, InteractionHand interactionHand, BlockHitResult blockHitResult) {
+        return showStatus(blockState, level, blockPos, player);
     }
 
     @Override
-    protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-        return showStatus(state, world, pos, player);
-    }
-
-    @Override
-    protected ActionResult onUseWithItem(
-        ItemStack stack,
-        BlockState state,
-        World world,
-        BlockPos pos,
-        PlayerEntity player,
-        Hand hand,
-        BlockHitResult hit
-    ) {
-        return showStatus(state, world, pos, player);
-    }
-
-    @Override
-    protected boolean emitsRedstonePower(BlockState state) {
+    protected boolean isSignalSource(BlockState blockState) {
         return true;
     }
 
     @Override
-    protected int getWeakRedstonePower(BlockState state, BlockView world, BlockPos pos, Direction direction) {
-        return redstonePower(world, pos);
+    protected int getSignal(BlockState blockState, BlockGetter blockGetter, BlockPos blockPos, Direction direction) {
+        return redstonePower(blockGetter, blockPos);
     }
 
     @Override
-    protected int getStrongRedstonePower(BlockState state, BlockView world, BlockPos pos, Direction direction) {
-        return redstonePower(world, pos);
+    protected int getDirectSignal(BlockState blockState, BlockGetter blockGetter, BlockPos blockPos, Direction direction) {
+        return redstonePower(blockGetter, blockPos);
     }
 
-    private ActionResult showStatus(BlockState state, World world, BlockPos pos, PlayerEntity player) {
-        if (world.isClient()) {
-            return ActionResult.SUCCESS;
+    private InteractionResult showStatus(BlockState state, Level world, BlockPos pos, Player player) {
+        if (world.isClientSide()) {
+            return InteractionResult.SUCCESS;
         }
-        if (!(world instanceof ServerWorld serverWorld)) {
-            return ActionResult.PASS;
+        if (!(world instanceof ServerLevel serverWorld)) {
+            return InteractionResult.PASS;
         }
         BlockEntity blockEntity = world.getBlockEntity(pos);
         if (!(blockEntity instanceof WindTurbineProbeBlockEntity probe)) {
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         }
         probe.sampleNow(serverWorld, state);
         if (!probe.hasSample()) {
-            player.sendMessage(Text.translatable("message.aerodynamics4mc.wind_turbine_probe.no_flow").formatted(Formatting.GRAY), false);
-            return ActionResult.SUCCESS_SERVER;
+            player.displayClientMessage(Component.translatable("message.aerodynamics4mc.wind_turbine_probe.no_flow").withStyle(ChatFormatting.GRAY), false);
+            return InteractionResult.SUCCESS_SERVER;
         }
 
         GameplayWindSample sample = probe.lastSample();
-        player.sendMessage(
-            Text.translatable(
-                "message.aerodynamics4mc.wind_turbine_probe.status",
-                format(probe.lastPowerWatts()),
-                probe.redstonePower()
-            ).formatted(Formatting.GOLD),
-            false
+        player.displayClientMessage(
+                Component.translatable(
+                        "message.aerodynamics4mc.wind_turbine_probe.status",
+                        format(probe.lastPowerWatts()),
+                        probe.redstonePower()
+                ).withStyle(ChatFormatting.GOLD),
+                false
         );
-        player.sendMessage(
-            Text.translatable(
-                "message.aerodynamics4mc.wind_turbine_probe.wind",
-                format(sample.effectiveSpeedMetersPerSecond()),
-                format(sample.meanSpeedMetersPerSecond()),
-                format(sample.gustVelocity().length()),
-                signed(sample.updraftMetersPerSecond())
-            ).formatted(Formatting.AQUA),
-            false
+        player.displayClientMessage(
+                Component.translatable(
+                        "message.aerodynamics4mc.wind_turbine_probe.wind",
+                        format(sample.effectiveSpeedMetersPerSecond()),
+                        format(sample.meanSpeedMetersPerSecond()),
+                        format(sample.gustVelocity().length()),
+                        signed(sample.updraftMetersPerSecond())
+                ).withStyle(ChatFormatting.AQUA),
+                false
         );
-        player.sendMessage(
-            Text.translatable(
-                "message.aerodynamics4mc.wind_turbine_probe.source",
-                sample.sourceLevel().name(),
-                sample.authority().name(),
-                percent(sample.confidence()),
-                percent(sample.shelterFactor()),
-                format(sample.turbulenceIntensity())
-            ).formatted(Formatting.GRAY),
-            false
+        player.displayClientMessage(
+                Component.translatable(
+                        "message.aerodynamics4mc.wind_turbine_probe.source",
+                        sample.sourceLevel().name(),
+                        sample.authority().name(),
+                        percent(sample.confidence()),
+                        percent(sample.shelterFactor()),
+                        format(sample.turbulenceIntensity())
+                ).withStyle(ChatFormatting.GRAY),
+                false
         );
-        return ActionResult.SUCCESS_SERVER;
+        return InteractionResult.SUCCESS_SERVER;
     }
 
-    private static int redstonePower(BlockView world, BlockPos pos) {
+    private static int redstonePower(BlockGetter world, BlockPos pos) {
         BlockEntity blockEntity = world.getBlockEntity(pos);
         if (blockEntity instanceof WindTurbineProbeBlockEntity probe) {
             return probe.redstonePower();

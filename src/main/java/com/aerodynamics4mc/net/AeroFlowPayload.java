@@ -1,12 +1,11 @@
 package com.aerodynamics4mc.net;
 
 import com.aerodynamics4mc.ModBlocks;
-
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 public record AeroFlowPayload(
     Identifier dimensionId,
@@ -14,13 +13,13 @@ public record AeroFlowPayload(
     int sampleStride,
     short[] packedFlow,
     byte[] packedFlowBytes
-) implements CustomPayload {
+) implements CustomPacketPayload {
     private static final int MAX_PACKED_FLOW_SHORTS = 1_048_576;
 
-    public static final CustomPayload.Id<AeroFlowPayload> ID =
-        new CustomPayload.Id<>(Identifier.of(ModBlocks.MOD_ID, "flow_field"));
-    public static final PacketCodec<RegistryByteBuf, AeroFlowPayload> CODEC =
-        PacketCodec.of(AeroFlowPayload::write, AeroFlowPayload::new);
+    public static final Type<AeroFlowPayload> ID =
+        new Type<>(Identifier.fromNamespaceAndPath(ModBlocks.MOD_ID, "flow_field"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, AeroFlowPayload> CODEC =
+			StreamCodec.ofMember(AeroFlowPayload::write, AeroFlowPayload::new);
 
     public AeroFlowPayload {
         if (packedFlow == null) {
@@ -48,7 +47,7 @@ public record AeroFlowPayload(
         return new AeroFlowPayload(dimensionId, origin, sampleStride, packedFlow, packedFlowBytes);
     }
 
-    private AeroFlowPayload(RegistryByteBuf buf) {
+    private AeroFlowPayload(RegistryFriendlyByteBuf buf) {
         this(buf.readIdentifier(), buf.readBlockPos(), buf.readVarInt(), readPackedFlowBytes(buf));
     }
 
@@ -56,7 +55,7 @@ public record AeroFlowPayload(
         this(dimensionId, origin, sampleStride, decodePackedFlow(packedFlowBytes), packedFlowBytes);
     }
 
-    private static byte[] readPackedFlowBytes(RegistryByteBuf buf) {
+    private static byte[] readPackedFlowBytes(RegistryFriendlyByteBuf buf) {
         int length = buf.readVarInt();
         if (length < 0 || length > MAX_PACKED_FLOW_SHORTS) {
             throw new IllegalArgumentException("Invalid flow payload length: " + length);
@@ -99,7 +98,7 @@ public record AeroFlowPayload(
         return data;
     }
 
-    private void write(RegistryByteBuf buf) {
+    private void write(RegistryFriendlyByteBuf buf) {
         buf.writeIdentifier(dimensionId);
         buf.writeBlockPos(origin);
         buf.writeVarInt(sampleStride);
@@ -108,7 +107,7 @@ public record AeroFlowPayload(
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

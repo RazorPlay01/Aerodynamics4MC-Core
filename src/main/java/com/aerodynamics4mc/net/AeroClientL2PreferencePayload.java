@@ -1,28 +1,27 @@
 package com.aerodynamics4mc.net;
 
 import com.aerodynamics4mc.ModBlocks;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+public record AeroClientL2PreferencePayload(boolean localL2Enabled) implements CustomPacketPayload {
+	public static final Type<AeroClientL2PreferencePayload> ID =
+			new Type<>(Identifier.fromNamespaceAndPath(ModBlocks.MOD_ID, "client_l2_preference"));
+	public static final StreamCodec<RegistryFriendlyByteBuf, AeroClientL2PreferencePayload> CODEC =
+			StreamCodec.ofMember(AeroClientL2PreferencePayload::write, AeroClientL2PreferencePayload::new);
 
-public record AeroClientL2PreferencePayload(boolean localL2Enabled) implements CustomPayload {
-    public static final CustomPayload.Id<AeroClientL2PreferencePayload> ID =
-        new CustomPayload.Id<>(Identifier.of(ModBlocks.MOD_ID, "client_l2_preference"));
-    public static final PacketCodec<RegistryByteBuf, AeroClientL2PreferencePayload> CODEC =
-        PacketCodec.of(AeroClientL2PreferencePayload::write, AeroClientL2PreferencePayload::new);
+	private AeroClientL2PreferencePayload(RegistryFriendlyByteBuf buf) {
+		this(buf.readBoolean());
+	}
 
-    private AeroClientL2PreferencePayload(RegistryByteBuf buf) {
-        this(buf.readBoolean());
-    }
+	private void write(RegistryFriendlyByteBuf buf) {
+		buf.writeBoolean(localL2Enabled);
+	}
 
-    private void write(RegistryByteBuf buf) {
-        buf.writeBoolean(localL2Enabled);
-    }
-
-    @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
-    }
+	@Override
+	public Type<? extends CustomPacketPayload> type() {
+		return ID;
+	}
 }

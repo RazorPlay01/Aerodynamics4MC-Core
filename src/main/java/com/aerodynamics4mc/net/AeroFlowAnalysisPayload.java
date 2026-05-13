@@ -1,81 +1,80 @@
 package com.aerodynamics4mc.net;
 
 import com.aerodynamics4mc.ModBlocks;
-
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 public record AeroFlowAnalysisPayload(
-    Identifier dimensionId,
-    BlockPos origin,
-    int baseSampleStride,
-    int fullResolution,
-    float velocityTolerance,
-    float pressureTolerance,
-    short[] basePackedFlow,
-    byte[] residualVx,
-    byte[] residualVy,
-    byte[] residualVz,
-    byte[] residualPressure
-) implements CustomPayload {
-    private static final int MAX_PACKED_FLOW_SHORTS = 1_048_576;
-    private static final int MAX_RESIDUAL_BYTES = 4_194_304;
+		Identifier dimensionId,
+		BlockPos origin,
+		int baseSampleStride,
+		int fullResolution,
+		float velocityTolerance,
+		float pressureTolerance,
+		short[] basePackedFlow,
+		byte[] residualVx,
+		byte[] residualVy,
+		byte[] residualVz,
+		byte[] residualPressure
+) implements CustomPacketPayload {
+	private static final int MAX_PACKED_FLOW_SHORTS = 1_048_576;
+	private static final int MAX_RESIDUAL_BYTES = 4_194_304;
 
-    public static final CustomPayload.Id<AeroFlowAnalysisPayload> ID =
-        new CustomPayload.Id<>(Identifier.of(ModBlocks.MOD_ID, "flow_field_analysis"));
-    public static final PacketCodec<RegistryByteBuf, AeroFlowAnalysisPayload> CODEC =
-        PacketCodec.of(AeroFlowAnalysisPayload::write, AeroFlowAnalysisPayload::new);
+	public static final Type<AeroFlowAnalysisPayload> ID =
+			new Type<>(Identifier.fromNamespaceAndPath(ModBlocks.MOD_ID, "flow_field_analysis"));
+	public static final StreamCodec<RegistryFriendlyByteBuf, AeroFlowAnalysisPayload> CODEC =
+			StreamCodec.ofMember(AeroFlowAnalysisPayload::write, AeroFlowAnalysisPayload::new);
 
-    private AeroFlowAnalysisPayload(RegistryByteBuf buf) {
-        this(
-            buf.readIdentifier(),
-            buf.readBlockPos(),
-            buf.readVarInt(),
-            buf.readVarInt(),
-            buf.readFloat(),
-            buf.readFloat(),
-            readPackedFlow(buf),
-            buf.readByteArray(MAX_RESIDUAL_BYTES),
-            buf.readByteArray(MAX_RESIDUAL_BYTES),
-            buf.readByteArray(MAX_RESIDUAL_BYTES),
-            buf.readByteArray(MAX_RESIDUAL_BYTES)
-        );
-    }
+	private AeroFlowAnalysisPayload(RegistryFriendlyByteBuf buf) {
+		this(
+				buf.readIdentifier(),
+				buf.readBlockPos(),
+				buf.readVarInt(),
+				buf.readVarInt(),
+				buf.readFloat(),
+				buf.readFloat(),
+				readPackedFlow(buf),
+				buf.readByteArray(MAX_RESIDUAL_BYTES),
+				buf.readByteArray(MAX_RESIDUAL_BYTES),
+				buf.readByteArray(MAX_RESIDUAL_BYTES),
+				buf.readByteArray(MAX_RESIDUAL_BYTES)
+		);
+	}
 
-    private static short[] readPackedFlow(RegistryByteBuf buf) {
-        int length = buf.readVarInt();
-        if (length < 0 || length > MAX_PACKED_FLOW_SHORTS) {
-            throw new IllegalArgumentException("Invalid flow analysis base length: " + length);
-        }
-        short[] data = new short[length];
-        for (int i = 0; i < length; i++) {
-            data[i] = buf.readShort();
-        }
-        return data;
-    }
+	private static short[] readPackedFlow(RegistryFriendlyByteBuf buf) {
+		int length = buf.readVarInt();
+		if (length < 0 || length > MAX_PACKED_FLOW_SHORTS) {
+			throw new IllegalArgumentException("Invalid flow analysis base length: " + length);
+		}
+		short[] data = new short[length];
+		for (int i = 0; i < length; i++) {
+			data[i] = buf.readShort();
+		}
+		return data;
+	}
 
-    private void write(RegistryByteBuf buf) {
-        buf.writeIdentifier(dimensionId);
-        buf.writeBlockPos(origin);
-        buf.writeVarInt(baseSampleStride);
-        buf.writeVarInt(fullResolution);
-        buf.writeFloat(velocityTolerance);
-        buf.writeFloat(pressureTolerance);
-        buf.writeVarInt(basePackedFlow.length);
-        for (short value : basePackedFlow) {
-            buf.writeShort(value);
-        }
-        buf.writeByteArray(residualVx);
-        buf.writeByteArray(residualVy);
-        buf.writeByteArray(residualVz);
-        buf.writeByteArray(residualPressure);
-    }
+	private void write(RegistryFriendlyByteBuf buf) {
+		buf.writeIdentifier(dimensionId);
+		buf.writeBlockPos(origin);
+		buf.writeVarInt(baseSampleStride);
+		buf.writeVarInt(fullResolution);
+		buf.writeFloat(velocityTolerance);
+		buf.writeFloat(pressureTolerance);
+		buf.writeVarInt(basePackedFlow.length);
+		for (short value : basePackedFlow) {
+			buf.writeShort(value);
+		}
+		buf.writeByteArray(residualVx);
+		buf.writeByteArray(residualVy);
+		buf.writeByteArray(residualVz);
+		buf.writeByteArray(residualPressure);
+	}
 
-    @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
-    }
+	@Override
+	public Type<? extends CustomPacketPayload> type() {
+		return ID;
+	}
 }
