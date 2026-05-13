@@ -19,16 +19,16 @@ import com.aerodynamics4mc.runtime.NativeSimulationBridge;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.Vec3;
 
 final class ClientL2Solver {
     private static final Logger LOGGER = LoggerFactory.getLogger("aerodynamics4mc/ClientL2Solver");
@@ -551,7 +551,7 @@ final class ClientL2Solver {
         if (!experimentalEnabled) {
             return;
         }
-        Identifier dimensionId = world.getRegistryKey().getValue();
+        Identifier dimensionId = world.dimension().identifier();
         invalidateStaticCacheForPatchFootprint(dimensionId, pos, oldState, newState);
         if (!streamingEnabled || clientSolveDisabled || worldKey == 0L) {
             return;
@@ -1216,7 +1216,7 @@ final class ClientL2Solver {
             return false;
         }
         if (!stagedCoarseSeedReady) {
-            Vec3d center = new Vec3d(
+            Vec3 center = new Vec3(
                 stagedOrigin.getX() + BRICK_SIZE * 0.5,
                 stagedOrigin.getY() + BRICK_SIZE * 0.5,
                 stagedOrigin.getZ() + BRICK_SIZE * 0.5
@@ -1442,7 +1442,7 @@ final class ClientL2Solver {
             int z = rem - y * BRICK_SIZE;
             int base = cell * FLOW_CHANNELS;
             if (obstacle[cell] == 0 && isBoundaryReferenceCell(x, y, z)) {
-                Vec3d pos = new Vec3d(
+                Vec3 pos = new Vec3(
                     boundaryRefreshOrigin.getX() + x + 0.5,
                     boundaryRefreshOrigin.getY() + y + 0.5,
                     boundaryRefreshOrigin.getZ() + z + 0.5
@@ -1474,16 +1474,6 @@ final class ClientL2Solver {
         return boundaryRefreshCursor >= CELL_COUNT
                 ? BoundaryReferenceBuildResult.COMPLETED
                 : BoundaryReferenceBuildResult.IN_PROGRESS;
-    }
-
-    private boolean isBoundaryReferenceCell(int x, int y, int z) {
-        int layers = Math.min(8, BRICK_SIZE);
-        return x < layers
-                || y < layers
-                || z < layers
-                || x >= BRICK_SIZE - layers
-                || y >= BRICK_SIZE - layers
-                || z >= BRICK_SIZE - layers;
     }
 
     private boolean isBoundaryReferenceCell(int x, int y, int z) {
@@ -1903,65 +1893,13 @@ final class ClientL2Solver {
     private void populateStaticCell(ClientLevel world, BlockPos origin, int x, int y, int z) {
         staticCursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
         int cell = cellIndex(x, y, z);
-        StaticCellSample sample = sampleStaticSourceCell(world, staticCursor);
+        StaticCellSample sample = sampleStaticCell(world, staticCursor);
         obstacle[cell] = sample.solid() ? (byte) 1 : (byte) 0;
         surfaceKind[cell] = sample.surfaceKind();
         openFaceMask[cell] = sample.openFaceMask();
         emitterPower[cell] = sample.emitterPowerWatts();
         sourceFanDirection[cell] = sample.sourceFanDirection();
         sourceEmitterPower[cell] = sample.sourceEmitterPowerWatts();
-    }
-
-    private StaticCellSample sampleStaticSourceCell(ClientWorld world, BlockPos pos) {
-        BlockState state = world.getBlockState(pos);
-        boolean solid = isSolidObstacle(world, pos, state);
-        short mask = 0;
-        if (!solid) {
-            for (Direction direction : Direction.values()) {
-                staticNeighbor.set(
-                    pos.getX() + direction.getOffsetX(),
-                    pos.getY() + direction.getOffsetY(),
-                    pos.getZ() + direction.getOffsetZ()
-                );
-                if (!isSolidObstacle(world, staticNeighbor, world.getBlockState(staticNeighbor))) {
-                    mask = (short) (mask | (1 << direction.ordinal()));
-                }
-            }
-        }
-        return new StaticCellSample(
-            solid,
-            (byte) 0,
-            mask,
-            0.0f,
-            (byte) sourceFanDirectionCodeForState(state),
-            sourceEmitterPowerForState(state)
-        );
-    }
-
-    private StaticCellSample sampleStaticCell(ClientWorld world, BlockPos pos) {
-        BlockState state = world.getBlockState(pos);
-        boolean solid = isSolidObstacle(world, pos, state);
-        short mask = 0;
-        if (!solid) {
-            for (Direction direction : Direction.values()) {
-                staticNeighbor.set(
-                        pos.getX() + direction.getStepX(),
-                        pos.getY() + direction.getStepY(),
-                        pos.getZ() + direction.getStepZ()
-                );
-                if (!isSolidObstacle(world, staticNeighbor, world.getBlockState(staticNeighbor))) {
-                    mask = (short) (mask | (1 << direction.ordinal()));
-                }
-            }
-        }
-        return new StaticCellSample(
-                solid,
-                (byte) 0,
-                mask,
-                0.0f,
-                (byte) sourceFanDirectionCodeForState(state),
-                sourceEmitterPowerForState(state)
-        );
     }
 
     private StaticCellSample sampleStaticCell(ClientLevel world, BlockPos pos) {
