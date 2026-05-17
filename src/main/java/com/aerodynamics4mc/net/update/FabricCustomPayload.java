@@ -1,5 +1,5 @@
-/*
-package com.aerodynamics4mc.net;
+package com.aerodynamics4mc.net.update;
+//? fabric {
 
 import com.aerodynamics4mc.ModTemplate;
 import com.github.razorplay.packet_handler.network.IPacket;
@@ -7,6 +7,7 @@ import com.github.razorplay.packet_handler.network.PacketTCP;
 import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteStreams;
 import io.netty.buffer.ByteBuf;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -47,5 +48,11 @@ public record FabricCustomPayload(IPacket packet) implements CustomPacketPayload
 	public Type<? extends CustomPacketPayload> type() {
 		return CUSTOM_PAYLOAD_ID;
 	}
+
+	public static void register() {
+		ModTemplate.LOGGER.info("Registering Packets for " + ModTemplate.MOD_ID);
+		PayloadTypeRegistry.playC2S().register(FabricCustomPayload.CUSTOM_PAYLOAD_ID, FabricCustomPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(FabricCustomPayload.CUSTOM_PAYLOAD_ID, FabricCustomPayload.CODEC);
+	}
 }
-*/
+//?}

@@ -113,5 +113,5 @@ dependencies {
 	testCompileOnly("org.projectlombok:lombok:1.18.46")
 	testAnnotationProcessor("org.projectlombok:lombok:1.18.46")
 
-	//include(implementation("com.github.RazorPlay01:PacketHandler:1.3.0")!!)
+	include(implementation("com.github.RazorPlay01:PacketHandler:1.3.0")!!)
 }
