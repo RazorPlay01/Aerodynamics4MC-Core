@@ -7,6 +7,7 @@ import com.aerodynamics4mc.net.AeroCoarseWindPayload;
 import com.aerodynamics4mc.net.AeroFlowAnalysisPayload;
 import com.aerodynamics4mc.net.AeroFlowPayload;
 import com.aerodynamics4mc.net.AeroRuntimeStatePayload;
+import lombok.Getter;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -14,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
+@Getter
 public final class AeroClientMod {
 
 	private static AeroClientMod instance = null;
@@ -33,24 +35,9 @@ public final class AeroClientMod {
 	}
 
 	public void onInitializeClient() {
-		ClientPlayNetworking.registerGlobalReceiver(AeroRuntimeStatePayload.ID, this::onRuntimeState);
-		ClientPlayNetworking.registerGlobalReceiver(AeroFlowPayload.ID, this::onFlowField);
-		ClientPlayNetworking.registerGlobalReceiver(AeroCoarseWindPayload.ID, this::onCoarseWindField);
-		ClientPlayNetworking.registerGlobalReceiver(AeroFlowAnalysisPayload.ID, this::onFlowAnalysis);
-
 		visualizer.initialize();
 		irisWindBridge.initialize();
 		clientL2Solver.initialize();
-	}
-
-	// ==================== Getters ====================
-
-	AeroVisualizer getVisualizer() {
-		return visualizer;
-	}
-
-	ClientL2Solver getClientL2Solver() {
-		return clientL2Solver;
 	}
 
 	Component renderStatusText() {
@@ -60,7 +47,7 @@ public final class AeroClientMod {
 		);
 	}
 
-	void sendClientL2Preference(boolean enabled) {
+	public static void sendClientL2Preference(boolean enabled) {
 		try {
 			if (ClientPlayNetworking.canSend(AeroClientL2PreferencePayload.ID)) {
 				ClientPlayNetworking.send(new AeroClientL2PreferencePayload(enabled));
@@ -72,36 +59,36 @@ public final class AeroClientMod {
 
 	// ====================== Network Handlers ======================
 
-	private void onRuntimeState(AeroRuntimeStatePayload payload, ClientPlayNetworking.Context context) {
+	public static void onRuntimeState(AeroRuntimeStatePayload payload, ClientPlayNetworking.Context context) {
 		context.client().execute(() -> {
-			visualizer.onRuntimeState(new AeroVisualizer.AeroFlowState(
+			getInstance().getVisualizer().onRuntimeState(new AeroVisualizer.AeroFlowState(
 					payload.streamingEnabled(),
 					payload.renderVelocityVectors(),
 					payload.renderStreamlines()
 			));
-			irisWindBridge.onRuntimeState(payload.streamingEnabled());
-			clientL2Solver.onRuntimeState(payload.streamingEnabled());
-			sendClientL2Preference(clientL2Solver.isExperimentalEnabled() && payload.streamingEnabled());
+			getInstance().getIrisWindBridge().onRuntimeState(payload.streamingEnabled());
+			getInstance().getClientL2Solver().onRuntimeState(payload.streamingEnabled());
+			sendClientL2Preference(getInstance().getClientL2Solver().isExperimentalEnabled() && payload.streamingEnabled());
 		});
 	}
 
-	private void onFlowField(AeroFlowPayload payload, ClientPlayNetworking.Context context) {
+	public static void onFlowField(AeroFlowPayload payload, ClientPlayNetworking.Context context) {
 		context.client().execute(() -> {
-			visualizer.onFlowField(payload);
-			irisWindBridge.markDirty();
+			getInstance().getVisualizer().onFlowField(payload);
+			getInstance().getIrisWindBridge().markDirty();
 		});
 	}
 
-	private void onCoarseWindField(AeroCoarseWindPayload payload, ClientPlayNetworking.Context context) {
+	public static void onCoarseWindField(AeroCoarseWindPayload payload, ClientPlayNetworking.Context context) {
 		context.client().execute(() -> {
-			visualizer.onCoarseWindField(payload);
-			clientL2Solver.onCoarseWindField(payload);
-			irisWindBridge.markDirty();
+			getInstance().getVisualizer().onCoarseWindField(payload);
+			getInstance().getClientL2Solver().onCoarseWindField(payload);
+			getInstance().getIrisWindBridge().markDirty();
 		});
 	}
 
-	private void onFlowAnalysis(AeroFlowAnalysisPayload payload, ClientPlayNetworking.Context context) {
-		context.client().execute(() -> visualizer.onFlowAnalysis(payload));
+	public static void onFlowAnalysis(AeroFlowAnalysisPayload payload, ClientPlayNetworking.Context context) {
+		context.client().execute(() -> getInstance().getVisualizer().onFlowAnalysis(payload));
 	}
 
 	// ====================== Static API ======================
