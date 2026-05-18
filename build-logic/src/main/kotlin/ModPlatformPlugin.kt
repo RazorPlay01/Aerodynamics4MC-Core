@@ -8,6 +8,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.dsl.RepositoryHandler
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Property
@@ -212,58 +213,54 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 				outDir.mkdirs()
 
 				var packedCount = 0
+				val root = rootProject.rootDir
 
-				val distNativesDir = file("native/dist/natives")
-				if (distNativesDir.exists()) {
-					copy {
-						from(distNativesDir)
-						into(outDir.resolve("natives"))
-					}
-					packedCount += fileTree(distNativesDir).files.size
-				}
+				logger.lifecycle("🔍 prepareNativeResources: Searching from the roots: ${root.absolutePath}")
 
-				val prebuiltDir = file("native/prebuilt")
-				if (prebuiltDir.exists()) {
-					copy {
-						from(prebuiltDir)
-						into(outDir)
-						exclude("**/.gitkeep")
-					}
-					packedCount += fileTree(prebuiltDir) { exclude("**/.gitkeep") }.files.size
-				}
-
-				val copyNativeBinary = { src: File, relativeTarget: String ->
-					if (src.exists()) {
-						val dst = outDir.resolve(relativeTarget)
+				val copyNative = { relativePath: String, target: String ->
+					val src = root.resolve(relativePath)
+					if (src.exists() && src.length() > 100_000) {
+						val dst = outDir.resolve(target)
 						dst.parentFile.mkdirs()
 						dst.writeBytes(src.readBytes())
 						packedCount++
+						logger.lifecycle("   ✅ Copied: $relativePath → $target")
+					} else if (src.exists()) {
+						logger.lifecycle("   ⚠️ Small file: $relativePath")
+					} else {
+						logger.lifecycle("   ❌ Not found: $relativePath")
 					}
 				}
 
-				copyNativeBinary(file("native/build/libaero_lbm.so"), "natives/linux-x86_64/libaero_lbm.so")
-				copyNativeBinary(file("native/build/aero_lbm.dll"), "natives/windows-x86_64/aero_lbm.dll")
-				copyNativeBinary(file("native/build/Release/aero_lbm.dll"), "natives/windows-x86_64/aero_lbm.dll")
-				copyNativeBinary(file("native/build-linux-arm64/libaero_lbm.so"), "natives/linux-arm64/libaero_lbm.so")
-				copyNativeBinary(file("native/build-macos-arm64/libaero_lbm.dylib"), "natives/macos-arm64/libaero_lbm.dylib")
-				copyNativeBinary(file("native/build-windows-x86_64/aero_lbm.dll"), "natives/windows-x86_64/aero_lbm.dll")
+				copyNative("native/build/libaero_lbm.so", "natives/linux-x86_64/libaero_lbm.so")
+				copyNative("native/build/aero_lbm.dll", "natives/windows-x86_64/aero_lbm.dll")
+				copyNative("native/build/Release/aero_lbm.dll", "natives/windows-x86_64/aero_lbm.dll")
+				copyNative("native/build-linux-arm64/libaero_lbm.so", "natives/linux-arm64/libaero_lbm.so")
+				copyNative("native/build-macos-arm64/libaero_lbm.dylib", "natives/macos-arm64/libaero_lbm.dylib")
+				copyNative("native/build-windows-x86_64/aero_lbm.dll", "natives/windows-x86_64/aero_lbm.dll")
 
 				if (packedCount == 0) {
-					logger.lifecycle("prepareNativeResources: no native binaries found")
+					logger.lifecycle("⚠️ No native binaries found")
 				} else {
-					logger.lifecycle("prepareNativeResources: packaged $packedCount native file(s)")
+					logger.lifecycle("✅ Packaged $packedCount native file(s)")
 				}
 			}
 		}
 
+		// === Configuración corregida (evita duplicados) ===
 		tasks.named<ProcessResources>("processResources") {
 			dependsOn(prepareNativeResources)
-			from(generatedNativeResourcesDir)
+			from(generatedNativeResourcesDir) { into("") }
 		}
 
 		tasks.withType<Jar>().configureEach {
-			if (name == ctx.loader.sourcesJarTask) {
-				dependsOn(prepareNativeResources)
+			dependsOn(prepareNativeResources)
+
+			// Evitamos duplicados
+			duplicatesStrategy = DuplicatesStrategy.INCLUDE   // o WARN / EXCLUDE
+
+			from(generatedNativeResourcesDir) {
+				into("")
 			}
 		}
 	}

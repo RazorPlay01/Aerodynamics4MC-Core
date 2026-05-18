@@ -1,5 +1,8 @@
 package com.aerodynamics4mc.platform;
 
+import com.github.razorplay.packet_handler.network.IPacket;
+import net.minecraft.server.level.ServerPlayer;
+
 public interface Platform {
 	boolean isModLoaded(String modId);
 
@@ -16,4 +19,8 @@ public interface Platform {
 	enum ModLoader {
 		FABRIC, NEOFORGE, FORGE, QUILT
 	}
+
+	void sendPacketToServer(IPacket packet);
+
+	void sendPacketToClient(IPacket packet, ServerPlayer player);
 }

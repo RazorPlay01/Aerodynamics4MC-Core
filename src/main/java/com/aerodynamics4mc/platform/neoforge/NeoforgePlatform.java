@@ -28,5 +28,15 @@ public class NeoforgePlatform implements Platform {
 	public boolean isDevelopmentEnvironment() {
 		return !FMLLoader/^? if > 1.21.7 {^/.getCurrent()/^?}^/.isProduction();
 	}
+
+	@Override
+	public void sendPacketToServer(IPacket packet) {
+		PacketDistributor.sendToServer(new ForgeCustomPayload(packet));
+	}
+
+	@Override
+	public void sendPacketToClient(IPacket packet, ServerPlayer player) {
+		PacketDistributor.sendToPlayer(player, new ForgeCustomPayload(packet));
+	}
 }
 *///?}
