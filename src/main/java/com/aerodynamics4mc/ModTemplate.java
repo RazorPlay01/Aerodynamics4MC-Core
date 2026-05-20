@@ -2,12 +2,12 @@ package com.aerodynamics4mc;
 
 import com.aerodynamics4mc.block.ModBlocks;
 import com.aerodynamics4mc.client.AeroClientMod;
-import com.aerodynamics4mc.net.AeroNetworking;
-import com.aerodynamics4mc.net.update.packet.AeroClientL2PreferencePacket;
-import com.aerodynamics4mc.net.update.packet.AeroCoarseWindPacket;
-import com.aerodynamics4mc.net.update.packet.AeroFlowAnalysisPacket;
-import com.aerodynamics4mc.net.update.packet.AeroFlowPacket;
-import com.aerodynamics4mc.net.update.packet.AeroRuntimeStatePacket;
+import com.aerodynamics4mc.network.FabricCustomPayload;
+import com.aerodynamics4mc.network.packet.AeroClientL2PreferencePacket;
+import com.aerodynamics4mc.network.packet.AeroCoarseWindPacket;
+import com.aerodynamics4mc.network.packet.AeroFlowAnalysisPacket;
+import com.aerodynamics4mc.network.packet.AeroFlowPacket;
+import com.aerodynamics4mc.network.packet.AeroRuntimeStatePacket;
 import com.aerodynamics4mc.platform.Platform;
 
 import com.aerodynamics4mc.runtime.AeroServerRuntime;
@@ -39,13 +39,12 @@ public class ModTemplate {
 		LOGGER.debug("{}: { version: {}; friendly_name: {} }", MOD_ID, MOD_VERSION, MOD_FRIENDLY_NAME);
 		registerPackets();
 		//? fabric {
-		com.aerodynamics4mc.net.update.FabricCustomPayload.register();
+		FabricCustomPayload.register();
 		//?}
 		//? neoforge {
 		//com.aerodynamics4mc.net.update.ForgeCustomPayload.register();
 		//?}
 		ModBlocks.register();
-		AeroNetworking.registerPayloadTypes();
 		AeroServerRuntime.init();
 	}
 

@@ -4,7 +4,7 @@ import com.aerodynamics4mc.api.AeroWindSample;
 import com.aerodynamics4mc.api.AeroWindSamplingRules;
 import com.aerodynamics4mc.block.FanBlock;
 import com.aerodynamics4mc.block.ModBlocks;
-import com.aerodynamics4mc.net.AeroCoarseWindPayload;
+import com.aerodynamics4mc.network.packet.AeroCoarseWindPacket;
 import com.aerodynamics4mc.runtime.NativeSimulationBridge;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -528,11 +528,11 @@ final class ClientL2Solver {
         }
     }
 
-    void onCoarseWindField(AeroCoarseWindPayload payload) {
-        if (!streamingEnabled || !experimentalEnabled || payload == null) {
+    void onCoarseWindField(AeroCoarseWindPacket packet) {
+        if (!streamingEnabled || !experimentalEnabled || packet == null) {
             return;
         }
-        long serverTick = payload.serverTick();
+        long serverTick = packet.getServerTick();
         if (serverTick < 0L) {
             return;
         }

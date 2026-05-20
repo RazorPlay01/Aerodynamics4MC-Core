@@ -251,7 +251,6 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 			}
 		}
 
-		// === Configuración corregida (evita duplicados) ===
 		tasks.named<ProcessResources>("processResources") {
 			dependsOn(prepareNativeResources)
 			from(generatedNativeResourcesDir) { into("") }
@@ -260,8 +259,7 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 		tasks.withType<Jar>().configureEach {
 			dependsOn(prepareNativeResources)
 
-			// Evitamos duplicados
-			duplicatesStrategy = DuplicatesStrategy.INCLUDE   // o WARN / EXCLUDE
+			duplicatesStrategy = DuplicatesStrategy.INCLUDE
 
 			from(generatedNativeResourcesDir) {
 				into("")

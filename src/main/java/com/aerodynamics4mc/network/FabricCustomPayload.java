@@ -1,4 +1,4 @@
-package com.aerodynamics4mc.net.update;
+package com.aerodynamics4mc.network;
 //? fabric {
 
 import com.aerodynamics4mc.ModTemplate;

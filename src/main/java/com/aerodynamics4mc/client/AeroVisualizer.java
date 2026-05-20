@@ -4,9 +4,9 @@ import com.aerodynamics4mc.api.AeroWindSample;
 import com.aerodynamics4mc.api.AeroWindSamplingRules;
 import com.aerodynamics4mc.api.SamplePolicy;
 import com.aerodynamics4mc.flow.AnalysisFlowCodec;
-import com.aerodynamics4mc.net.AeroCoarseWindPayload;
-import com.aerodynamics4mc.net.AeroFlowAnalysisPayload;
-import com.aerodynamics4mc.net.AeroFlowPayload;
+import com.aerodynamics4mc.network.packet.AeroCoarseWindPacket;
+import com.aerodynamics4mc.network.packet.AeroFlowAnalysisPacket;
+import com.aerodynamics4mc.network.packet.AeroFlowPacket;
 import com.aerodynamics4mc.runtime.NativeSimulationBridge;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -86,12 +86,12 @@ final class AeroVisualizer {
         }
     }
 
-    void onFlowField(AeroFlowPayload payload) {
+    void onFlowField(AeroFlowPacket packet) {
         if (!streamingEnabled) {
             return;
         }
-        WindowKey key = new WindowKey(payload.dimensionId(), payload.origin());
-        remoteWindows.put(key, RemoteFlowField.fromPayload(payload, clientTickCounter));
+        WindowKey key = new WindowKey(packet.getDimensionId(), packet.getOrigin());
+        remoteWindows.put(key, RemoteFlowField.fromPayload(packet, clientTickCounter));
     }
 
     void onLocalFlowField(Identifier dimensionId, BlockPos origin, int sampleStride, short[] packedFlow) {
@@ -121,29 +121,29 @@ final class AeroVisualizer {
         remoteWindows.clear();
     }
 
-    void onCoarseWindField(AeroCoarseWindPayload payload) {
+    void onCoarseWindField(AeroCoarseWindPacket packet) {
         if (!streamingEnabled) {
             return;
         }
-        WindowKey key = new WindowKey(payload.dimensionType(), payload.origin());
-        coarseWindFields.put(key, CoarseWindField.fromPayload(payload, clientTickCounter));
+        WindowKey key = new WindowKey(packet.getDimensionType(), packet.getOrigin());
+        coarseWindFields.put(key, CoarseWindField.fromPayload(packet, clientTickCounter));
     }
 
-    void onFlowAnalysis(AeroFlowAnalysisPayload payload) {
+    void onFlowAnalysis(AeroFlowAnalysisPacket packet) {
         if (!streamingEnabled) {
             return;
         }
-        float[] flowState = AnalysisFlowCodec.decodePayload(analysisCodecBridge, payload);
+        float[] flowState = AnalysisFlowCodec.decodePayload(analysisCodecBridge, packet);
         if (flowState == null) {
             return;
         }
-        WindowKey key = new WindowKey(payload.dimensionId(), payload.origin());
+        WindowKey key = new WindowKey(packet.getDimensionId(), packet.getOrigin());
         analysisWindows.put(
                 key,
                 new AnalysisFlowField(
-                        payload.dimensionId(),
-                        payload.origin(),
-                        payload.fullResolution(),
+						packet.getDimensionId(),
+						packet.getOrigin(),
+						packet.getFullResolution(),
                         flowState,
                         clientTickCounter
                 )
@@ -975,16 +975,16 @@ final class AeroVisualizer {
             short[] packedAtmosphere,
             long lastUpdatedTick
     ) {
-        static CoarseWindField fromPayload(AeroCoarseWindPayload payload, long lastUpdatedTick) {
+        static CoarseWindField fromPayload(AeroCoarseWindPacket packet, long lastUpdatedTick) {
             return new CoarseWindField(
-                    payload.dimensionType(),
-                    payload.origin(),
-                    Math.max(1, payload.cellSize()),
-                    Math.max(1, payload.sizeX()),
-                    Math.max(1, payload.sizeY()),
-                    Math.max(1, payload.sizeZ()),
-                    payload.packedFlow(),
-                    payload.packedAtmosphere(),
+					packet.getDimensionType(),
+					packet.getOrigin(),
+                    Math.max(1, packet.getCellSize()),
+                    Math.max(1, packet.getSizeX()),
+                    Math.max(1, packet.getSizeY()),
+                    Math.max(1, packet.getSizeZ()),
+					packet.getPackedFlow(),
+					packet.getPackedAtmosphere(),
                     lastUpdatedTick
             );
         }
@@ -1047,12 +1047,12 @@ final class AeroVisualizer {
             AeroWindSample.Authority authority,
             long lastUpdatedTick
     ) {
-        static RemoteFlowField fromPayload(AeroFlowPayload payload, long lastUpdatedTick) {
+        static RemoteFlowField fromPayload(AeroFlowPacket packet, long lastUpdatedTick) {
             return fromPacked(
-                    payload.dimensionId(),
-                    payload.origin(),
-                    payload.sampleStride(),
-                    payload.packedFlow(),
+					packet.getDimensionId(),
+					packet.getOrigin(),
+					packet.getSampleStride(),
+					packet.getPackedFlow(),
                     AeroWindSample.Authority.SERVER_AUTHORITATIVE,
                     lastUpdatedTick
             );

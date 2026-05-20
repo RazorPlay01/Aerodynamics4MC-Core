@@ -1,5 +1,7 @@
 package com.aerodynamics4mc.client;
 
+import com.aerodynamics4mc.ModTemplate;
+import com.aerodynamics4mc.network.packet.AeroClientL2PreferencePacket;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
@@ -71,7 +73,7 @@ public class AeroClientCommands {
 		if (enabled) {
 			mod.getVisualizer().clearRemoteFlowFields();
 		}
-		mod.sendClientL2Preference(enabled);
+		ModTemplate.xplat().sendPacketToServer(new AeroClientL2PreferencePacket(enabled));
 		source.sendSuccess(() -> Component.literal("Client L2 local solve " + (enabled ? "enabled" : "disabled")), false);
 		return 1;
 	}

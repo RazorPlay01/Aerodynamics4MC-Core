@@ -1,12 +1,13 @@
 package com.aerodynamics4mc.client;
 
+import com.aerodynamics4mc.ModTemplate;
 import com.aerodynamics4mc.api.AeroWindSample;
 import com.aerodynamics4mc.api.SamplePolicy;
-import com.aerodynamics4mc.net.AeroClientL2PreferencePayload;
-import com.aerodynamics4mc.net.AeroCoarseWindPayload;
-import com.aerodynamics4mc.net.AeroFlowAnalysisPayload;
-import com.aerodynamics4mc.net.AeroFlowPayload;
-import com.aerodynamics4mc.net.AeroRuntimeStatePayload;
+import com.aerodynamics4mc.network.packet.AeroClientL2PreferencePacket;
+import com.aerodynamics4mc.network.packet.AeroCoarseWindPacket;
+import com.aerodynamics4mc.network.packet.AeroFlowAnalysisPacket;
+import com.aerodynamics4mc.network.packet.AeroFlowPacket;
+import com.aerodynamics4mc.network.packet.AeroRuntimeStatePacket;
 import lombok.Getter;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -47,48 +48,38 @@ public final class AeroClientMod {
 		);
 	}
 
-	public static void sendClientL2Preference(boolean enabled) {
-		try {
-			if (ClientPlayNetworking.canSend(AeroClientL2PreferencePayload.ID)) {
-				ClientPlayNetworking.send(new AeroClientL2PreferencePayload(enabled));
-			}
-		} catch (IllegalStateException ignored) {
-			// The client may be between play-networking sessions
-		}
-	}
-
 	// ====================== Network Handlers ======================
 
-	public static void onRuntimeState(AeroRuntimeStatePayload payload, ClientPlayNetworking.Context context) {
+	public static void onRuntimeState(AeroRuntimeStatePacket packet, ClientPlayNetworking.Context context) {
 		context.client().execute(() -> {
 			getInstance().getVisualizer().onRuntimeState(new AeroVisualizer.AeroFlowState(
-					payload.streamingEnabled(),
-					payload.renderVelocityVectors(),
-					payload.renderStreamlines()
+					packet.isStreamingEnabled(),
+					packet.isRenderVelocityVectors(),
+					packet.isRenderStreamlines()
 			));
-			getInstance().getIrisWindBridge().onRuntimeState(payload.streamingEnabled());
-			getInstance().getClientL2Solver().onRuntimeState(payload.streamingEnabled());
-			sendClientL2Preference(getInstance().getClientL2Solver().isExperimentalEnabled() && payload.streamingEnabled());
+			getInstance().getIrisWindBridge().onRuntimeState(packet.isStreamingEnabled());
+			getInstance().getClientL2Solver().onRuntimeState(packet.isStreamingEnabled());
+			ModTemplate.xplat().sendPacketToServer(new AeroClientL2PreferencePacket(getInstance().getClientL2Solver().isExperimentalEnabled() && packet.isStreamingEnabled()));
 		});
 	}
 
-	public static void onFlowField(AeroFlowPayload payload, ClientPlayNetworking.Context context) {
+	public static void onFlowField(AeroFlowPacket packet, ClientPlayNetworking.Context context) {
 		context.client().execute(() -> {
-			getInstance().getVisualizer().onFlowField(payload);
+			getInstance().getVisualizer().onFlowField(packet);
 			getInstance().getIrisWindBridge().markDirty();
 		});
 	}
 
-	public static void onCoarseWindField(AeroCoarseWindPayload payload, ClientPlayNetworking.Context context) {
+	public static void onCoarseWindField(AeroCoarseWindPacket packet, ClientPlayNetworking.Context context) {
 		context.client().execute(() -> {
-			getInstance().getVisualizer().onCoarseWindField(payload);
-			getInstance().getClientL2Solver().onCoarseWindField(payload);
+			getInstance().getVisualizer().onCoarseWindField(packet);
+			getInstance().getClientL2Solver().onCoarseWindField(packet);
 			getInstance().getIrisWindBridge().markDirty();
 		});
 	}
 
-	public static void onFlowAnalysis(AeroFlowAnalysisPayload payload, ClientPlayNetworking.Context context) {
-		context.client().execute(() -> getInstance().getVisualizer().onFlowAnalysis(payload));
+	public static void onFlowAnalysis(AeroFlowAnalysisPacket packet, ClientPlayNetworking.Context context) {
+		context.client().execute(() -> getInstance().getVisualizer().onFlowAnalysis(packet));
 	}
 
 	// ====================== Static API ======================
