@@ -1,4 +1,4 @@
-package com.aerodynamics4mc.net.update.util;
+package com.aerodynamics4mc.network.util;
 
 import com.github.razorplay.packet_handler.exceptions.PacketSerializationException;
 import com.github.razorplay.packet_handler.network.network_util.PacketDataSerializer;

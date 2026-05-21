@@ -1,6 +1,6 @@
-package com.aerodynamics4mc.net.update.packet;
+package com.aerodynamics4mc.network.packet;
 
-import com.aerodynamics4mc.net.update.util.MinecraftSerializer;
+import com.aerodynamics4mc.network.util.MinecraftSerializer;
 import com.github.razorplay.packet_handler.exceptions.PacketSerializationException;
 import com.github.razorplay.packet_handler.network.IPacket;
 import com.github.razorplay.packet_handler.network.network_util.PacketDataSerializer;

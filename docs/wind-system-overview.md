@@ -85,7 +85,7 @@ The mod runs **four cooperating components**, organized as one driver and three 
 ```
 
 Coarse-wind sync to clients: every server tick when state changes the server broadcasts an
-`AeroCoarseWindPayload` carrying L1 wind sampled on a 32-block grid (`COARSE_WIND_SYNC_CELL_SIZE_BLOCKS`).
+`AeroCoarseWindPacket` carrying L1 wind sampled on a 32-block grid (`COARSE_WIND_SYNC_CELL_SIZE_BLOCKS`).
 Clients use that payload to seed their own `ClientL2Solver` and to answer `AeroClientWindApi` queries.
 
 ### 1.2 Per-tick orchestration / 每 tick 编排
@@ -102,7 +102,7 @@ calls `driver.advance(...)`, `BackgroundMetGrid.refresh(...)`, `MesoscaleGrid.re
 | 4 | `MesoscaleGrid.refresh(...)` | every `MESOSCALE_REFRESH_TICKS` (≈ `MESOSCALE_MET_CELL_SIZE_BLOCKS = 64` ticks) | Rebuild L1 layers + L2 forcing payload from terrain, blocks, L0 sample |
 | 5 | `MesoscaleGrid.applyPendingNestedFeedback(...)` | every `L2_TO_L1_FEEDBACK_STEPS` | Push native L2 vorticity / divergence back into L1 cells |
 | 6 | `MesoscaleGrid.runPendingSteps(...)` (native LBM) | every tick (accumulator) | Step the D3Q27 solver as many times as `accumulatedDt / solverDt` allows |
-| 7 | Broadcast `AeroCoarseWindPayload` | when L1 changed | Used by `AeroClientWindApi` and `ClientL2Solver` |
+| 7 | Broadcast `AeroCoarseWindPacket` | when L1 changed | Used by `AeroClientWindApi` and `ClientL2Solver` |
 
 Constants are declared near the top of `AeroServerRuntime.java` (lines 81–266). The load-bearing ones:
 
@@ -424,7 +424,7 @@ with rated power in watts), and a few diagnostic slots. Detailed layout: see
 |--------|----------------------------------------------------------|--------------------------|
 | Domain | 64³ window (= `GRID_SIZE`) tracked around focus | 32³ bricks (`BRICK_SIZE`) around player; multiple bricks cached LRU |
 | Authority | Server-trusted; `AeroWindSample.authority() == SERVER_AUTHORITATIVE` | Client-local; **must not** drive server-side gameplay |
-| Forcing | From `MesoscaleGrid.buildForcing(...)` | Seeded from `AeroCoarseWindPayload` (32-block-cell L1 broadcast) |
+| Forcing | From `MesoscaleGrid.buildForcing(...)` | Seeded from `AeroCoarseWindPacket` (32-block-cell L1 broadcast) |
 | Compute | Native LBM via JNI | Native LBM via JNI on the client |
 | Visibility | Atlas streaming (currently disabled) | Local visualizer, particles, Iris bridge |
 
@@ -434,7 +434,7 @@ gated off; flipping it on requires re-validating multiplayer feedback aggregatio
 
 ### 5.4 Coarse-wind sync / 粗风同步包
 
-`AeroCoarseWindPayload` (in `net/AeroCoarseWindPayload.java`) is broadcast on L1 changes. It samples the
+`AeroCoarseWindPacket` (in `net/AeroCoarseWindPacket.java`) is broadcast on L1 changes. It samples the
 L1 wind on a `COARSE_WIND_SYNC_CELL_SIZE_BLOCKS = 32`-block grid around the player. The client uses it
 for two purposes:
 

@@ -84,7 +84,7 @@ private float[] snapshotFullRegionFlow(WindowKey key) { ... }
 // Phase 2: Diagnostic-only analysis flow payload.
 // This is NOT the authoritative state path. Native brick runtime owns the true L2 state.
 // This method exists solely for client-side flow visualization debugging.
-private AeroFlowAnalysisPayload buildAnalysisFlowPayload(...) { ... }
+private AeroFlowAnalysisPacket buildAnalysisFlowPayload(...) { ... }
 ```
 
 **Impact**: Clarified that Java no longer treats full region flow state as canonical. Native state is authoritative.

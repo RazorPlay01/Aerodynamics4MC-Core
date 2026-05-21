@@ -1,6 +1,6 @@
 package com.aerodynamics4mc.flow;
 
-import com.aerodynamics4mc.net.AeroFlowAnalysisPayload;
+import com.aerodynamics4mc.network.packet.AeroFlowAnalysisPacket;
 import com.aerodynamics4mc.runtime.NativeSimulationBridge;
 
 import net.minecraft.core.BlockPos;
@@ -9,7 +9,7 @@ import net.minecraft.resources.Identifier;
 public final class AnalysisFlowCodec {
     private AnalysisFlowCodec() {}
 
-    public static AeroFlowAnalysisPayload encodePayload(
+    public static AeroFlowAnalysisPacket encodePayload(
         NativeSimulationBridge bridge,
         Identifier dimensionId,
         BlockPos origin,
@@ -49,7 +49,7 @@ public final class AnalysisFlowCodec {
             return null;
         }
 
-        return new AeroFlowAnalysisPayload(
+        return new AeroFlowAnalysisPacket(
             dimensionId,
             origin,
             baseSampleStride,
@@ -64,27 +64,27 @@ public final class AnalysisFlowCodec {
         );
     }
 
-    public static float[] decodePayload(NativeSimulationBridge bridge, AeroFlowAnalysisPayload payload) {
-        if (bridge == null || payload == null || payload.fullResolution() <= 0) {
+    public static float[] decodePayload(NativeSimulationBridge bridge, AeroFlowAnalysisPacket packet) {
+        if (bridge == null || packet == null || packet.getFullResolution() <= 0) {
             return null;
         }
-        int resolution = payload.fullResolution();
+        int resolution = packet.getFullResolution();
         int cells = resolution * resolution * resolution;
-        float[] flowState = PackedFlowField.reconstructFullState(payload.basePackedFlow(), payload.baseSampleStride(), resolution);
+        float[] flowState = PackedFlowField.reconstructFullState(packet.getBasePackedFlow(), packet.getBaseSampleStride(), resolution);
         float[] residual = new float[cells];
-        if (!bridge.decompressFloatGrid3d(payload.residualVx(), resolution, resolution, resolution, residual)) {
+        if (!bridge.decompressFloatGrid3d(packet.getResidualVx(), resolution, resolution, resolution, residual)) {
             return null;
         }
         addResidualChannel(flowState, 0, residual);
-        if (!bridge.decompressFloatGrid3d(payload.residualVy(), resolution, resolution, resolution, residual)) {
+        if (!bridge.decompressFloatGrid3d(packet.getResidualVy(), resolution, resolution, resolution, residual)) {
             return null;
         }
         addResidualChannel(flowState, 1, residual);
-        if (!bridge.decompressFloatGrid3d(payload.residualVz(), resolution, resolution, resolution, residual)) {
+        if (!bridge.decompressFloatGrid3d(packet.getResidualVz(), resolution, resolution, resolution, residual)) {
             return null;
         }
         addResidualChannel(flowState, 2, residual);
-        if (!bridge.decompressFloatGrid3d(payload.residualPressure(), resolution, resolution, resolution, residual)) {
+        if (!bridge.decompressFloatGrid3d(packet.getResidualPressure(), resolution, resolution, resolution, residual)) {
             return null;
         }
         addResidualChannel(flowState, 3, residual);

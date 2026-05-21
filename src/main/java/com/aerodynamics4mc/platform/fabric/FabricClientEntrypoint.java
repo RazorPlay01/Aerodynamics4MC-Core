@@ -5,10 +5,12 @@ package com.aerodynamics4mc.platform.fabric;
 import com.aerodynamics4mc.ModTemplate;
 import com.aerodynamics4mc.client.AeroClientCommands;
 import com.aerodynamics4mc.client.AeroClientMod;
-import com.aerodynamics4mc.net.AeroCoarseWindPayload;
-import com.aerodynamics4mc.net.AeroFlowAnalysisPayload;
-import com.aerodynamics4mc.net.AeroFlowPayload;
-import com.aerodynamics4mc.net.AeroRuntimeStatePayload;
+import com.aerodynamics4mc.network.FabricCustomPayload;
+import com.aerodynamics4mc.network.packet.AeroCoarseWindPacket;
+import com.aerodynamics4mc.network.packet.AeroFlowAnalysisPacket;
+import com.aerodynamics4mc.network.packet.AeroFlowPacket;
+import com.aerodynamics4mc.network.packet.AeroRuntimeStatePacket;
+import com.github.razorplay.packet_handler.network.IPacket;
 import dev.kikugie.fletching_table.annotation.fabric.Entrypoint;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -19,10 +21,18 @@ public class FabricClientEntrypoint implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		ClientPlayNetworking.registerGlobalReceiver(AeroRuntimeStatePayload.ID, AeroClientMod::onRuntimeState);
-		ClientPlayNetworking.registerGlobalReceiver(AeroFlowPayload.ID, AeroClientMod::onFlowField);
-		ClientPlayNetworking.registerGlobalReceiver(AeroCoarseWindPayload.ID, AeroClientMod::onCoarseWindField);
-		ClientPlayNetworking.registerGlobalReceiver(AeroFlowAnalysisPayload.ID, AeroClientMod::onFlowAnalysis);
+		ClientPlayNetworking.registerGlobalReceiver(FabricCustomPayload.CUSTOM_PAYLOAD_ID, (payload, context) ->
+				context.client().execute(() -> {
+					IPacket packet = payload.packet();
+
+					switch (packet) {
+						case AeroRuntimeStatePacket pkt -> AeroClientMod.onRuntimeState(pkt, context);
+						case AeroFlowAnalysisPacket pkt -> AeroClientMod.onFlowAnalysis(pkt, context);
+						case AeroCoarseWindPacket pkt -> AeroClientMod.onCoarseWindField(pkt, context);
+						case AeroFlowPacket pkt -> AeroClientMod.onFlowField(pkt, context);
+						default -> ModTemplate.LOGGER.info("Unknown client packet: {}", packet.getPacketId());
+					}
+				}));
 		ModTemplate.onInitializeClient();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			if (!environment.includeDedicated) {
