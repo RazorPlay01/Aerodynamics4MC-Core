@@ -10,6 +10,9 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public record ForgeCustomPayload(IPacket packet) implements CustomPacketPayload {
 	public static final Type<ForgeCustomPayload> TYPE =
@@ -63,6 +66,9 @@ public record ForgeCustomPayload(IPacket packet) implements CustomPacketPayload 
 	                                      IPayloadContext context) {
 		IPacket packet = payload.packet();
 
+		context.enqueueWork(() -> {
+
+		});
 	}
 
 	private static void handleServerbound(ForgeCustomPayload payload,

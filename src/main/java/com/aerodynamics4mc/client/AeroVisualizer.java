@@ -10,11 +10,8 @@ import com.aerodynamics4mc.network.packet.AeroFlowPacket;
 import com.aerodynamics4mc.runtime.NativeSimulationBridge;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gizmos.GizmoStyle;
@@ -29,7 +26,13 @@ import org.joml.Matrix4f;
 import java.util.HashMap;
 import java.util.Map;
 
-final class AeroVisualizer {
+//? fabric{
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
+//?} neoforge{
+//import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+//?}
+
+public final class AeroVisualizer {
     private static final float ATLAS_VELOCITY_RANGE = 5.6f;
     private static final float ATLAS_PRESSURE_RANGE = 0.03f;
     private static final int COARSE_ATMOSPHERE_CHANNELS = 10;
@@ -70,12 +73,6 @@ final class AeroVisualizer {
     private boolean renderVelocityVectors = false;
     private boolean renderStreamlines = true;
     private long clientTickCounter;
-
-    void initialize() {
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clearState());
-        ClientTickEvents.END_CLIENT_TICK.register(client -> onClientTick());
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::renderAtlasOverlay);
-    }
 
     void onRuntimeState(AeroFlowState state) {
         streamingEnabled = state.streamingEnabled();
@@ -150,7 +147,7 @@ final class AeroVisualizer {
         );
     }
 
-    void clearState() {
+    public void clearState() {
         remoteWindows.clear();
         localWindows.clear();
         coarseWindFields.clear();
@@ -263,7 +260,7 @@ final class AeroVisualizer {
         return best;
     }
 
-    private void onClientTick() {
+    public void onClientTick() {
         clientTickCounter++;
         if (!streamingEnabled) {
             return;
@@ -285,7 +282,7 @@ final class AeroVisualizer {
         });
     }
 
-    private void renderAtlasOverlay(WorldRenderContext context) {
+    public void renderAtlasOverlay(/*? fabric{ */ WorldRenderContext /*?} neoforge{ */ /*RenderLevelStageEvent.AfterTranslucentBlocks*/ /*?} */ context) {
         if (!streamingEnabled || (remoteWindows.isEmpty() && localWindows.isEmpty())) {
             return;
         }
@@ -295,9 +292,13 @@ final class AeroVisualizer {
         }
         Identifier dimensionId = client.level.dimension().identifier();
         Vec3 cameraPos = client.gameRenderer.getMainCamera().position();
-        VertexConsumer lineBuffer = context.consumers() == null ? null : context.consumers().getBuffer(RenderTypes.lines());
-        PoseStack matrices = context.matrices();
-        try (var ignored = client.collectPerTickGizmos()) {
+
+		MultiBufferSource.BufferSource bufferSource = client.renderBuffers().bufferSource();
+		VertexConsumer lineBuffer = bufferSource.getBuffer(RenderTypes.lines());
+
+        PoseStack matrices =  /*? fabric{ */ context.matrices(); /*?} neoforge{ */ /*context.getPoseStack();*/ /*?} */
+
+		try (var ignored = client.collectPerTickGizmos()) {
             for (RemoteFlowField field : localWindows.values()) {
                 if (!field.dimensionId().equals(dimensionId)) {
                     continue;
@@ -332,6 +333,7 @@ final class AeroVisualizer {
                 renderAnalysisOverlay(analysisSlice);
             }
         }
+		bufferSource.endBatch(RenderTypes.lines());
     }
 
     private void renderAnalysisOverlay(AnalysisSliceView analysisSlice) {

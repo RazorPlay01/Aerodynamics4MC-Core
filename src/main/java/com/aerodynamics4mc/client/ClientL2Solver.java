@@ -6,9 +6,6 @@ import com.aerodynamics4mc.block.FanBlock;
 import com.aerodynamics4mc.block.ModBlocks;
 import com.aerodynamics4mc.network.packet.AeroCoarseWindPacket;
 import com.aerodynamics4mc.runtime.NativeSimulationBridge;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -28,7 +25,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-final class ClientL2Solver {
+public final class ClientL2Solver {
     private static final Logger LOGGER = LoggerFactory.getLogger("aerodynamics4mc/ClientL2Solver");
 
     private enum SolverMode {
@@ -515,9 +512,6 @@ final class ClientL2Solver {
             BRICK_SIZE,
             CLIENT_L2_MODE.experimental()
         );
-        ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> close());
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> close());
     }
 
     void onRuntimeState(boolean streamingEnabled) {
@@ -563,7 +557,7 @@ final class ClientL2Solver {
         queueStaticPatchPositions(dimensionId, worldKey, world.getGameTime(), pos, oldState, newState);
     }
 
-    private void onClientTick(Minecraft client) {
+    public void onClientTick(Minecraft client) {
         drainWorkerAtlases();
         if (!experimentalEnabled || !streamingEnabled || client.level == null || client.player == null) {
             return;
@@ -2822,7 +2816,7 @@ final class ClientL2Solver {
         visualizer.clearLocalFlowFields();
     }
 
-    private void close() {
+    public void close() {
         resetActiveBrick();
         clientSolveDisabled = false;
         staticBrickCache.clear();

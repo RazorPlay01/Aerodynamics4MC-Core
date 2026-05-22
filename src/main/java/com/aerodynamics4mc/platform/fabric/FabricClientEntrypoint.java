@@ -13,7 +13,11 @@ import com.aerodynamics4mc.network.packet.AeroRuntimeStatePacket;
 import com.github.razorplay.packet_handler.network.IPacket;
 import dev.kikugie.fletching_table.annotation.fabric.Entrypoint;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
 @Entrypoint("client")
@@ -34,6 +38,24 @@ public class FabricClientEntrypoint implements ClientModInitializer {
 					}
 				}));
 		ModTemplate.onInitializeClient();
+
+		ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
+			AeroClientMod.getInstance().getClientL2Solver().onClientTick(minecraft);
+			AeroClientMod.getInstance().getVisualizer().onClientTick();
+			AeroClientMod.getInstance().getIrisWindBridge().onClientTick(minecraft);
+		});
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			AeroClientMod.getInstance().getClientL2Solver().close();
+			AeroClientMod.getInstance().getVisualizer().clearState();
+			AeroClientMod.getInstance().getIrisWindBridge().clear();
+		});
+		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+			AeroClientMod.getInstance().getClientL2Solver().close();
+			AeroClientMod.getInstance().getIrisWindBridge().close();
+		});
+
+		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context -> AeroClientMod.getInstance().getVisualizer().renderAtlasOverlay(context));
+		WorldRenderEvents.START_MAIN.register(context -> AeroClientMod.getInstance().getIrisWindBridge().onRenderFrame());
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			if (!environment.includeDedicated) {
 				AeroClientCommands.register(dispatcher, registryAccess);
