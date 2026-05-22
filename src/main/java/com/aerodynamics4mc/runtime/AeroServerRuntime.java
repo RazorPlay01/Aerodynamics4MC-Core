@@ -6,29 +6,13 @@ import com.aerodynamics4mc.api.AeroWindSamplingRules;
 import com.aerodynamics4mc.api.GameplayWindSample;
 import com.aerodynamics4mc.api.SamplePolicy;
 import com.aerodynamics4mc.block.ModBlocks;
-import com.aerodynamics4mc.client.AeroClientMod;
 import com.aerodynamics4mc.flow.AnalysisFlowCodec;
-import com.aerodynamics4mc.network.FabricCustomPayload;
-import com.aerodynamics4mc.network.packet.AeroClientL2PreferencePacket;
 import com.aerodynamics4mc.network.packet.AeroCoarseWindPacket;
 import com.aerodynamics4mc.network.packet.AeroFlowAnalysisPacket;
 import com.aerodynamics4mc.network.packet.AeroFlowPacket;
 import com.aerodynamics4mc.network.packet.AeroRuntimeStatePacket;
-import com.github.razorplay.packet_handler.network.IPacket;
-import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import lombok.Getter;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -60,7 +44,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -413,36 +396,6 @@ public final class AeroServerRuntime {
 		// private constructor
 	}
 
-	public static void init() {
-		ServerTickEvents.END_SERVER_TICK.register(INSTANCE::onServerTick);
-		ServerChunkEvents.CHUNK_LOAD.register(INSTANCE::onChunkLoad);
-		ServerChunkEvents.CHUNK_UNLOAD.register(INSTANCE::onChunkUnload);
-		ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register(INSTANCE::onBlockEntityLoad);
-		ServerBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register(INSTANCE::onBlockEntityUnload);
-		ServerWorldEvents.UNLOAD.register((server, world) -> INSTANCE.onWorldUnload(world));
-		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-			INSTANCE.sendStateToPlayer(handler.player, server);
-			INSTANCE.broadcastState(server);
-			INSTANCE.sendFlowSnapshotToPlayer(handler.player, server);
-		});
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-			INSTANCE.onPlayerDisconnected(handler.player);
-			INSTANCE.broadcastState(server);
-		});
-		ServerPlayNetworking.registerGlobalReceiver(FabricCustomPayload.CUSTOM_PAYLOAD_ID, (payload, context) ->
-				context.server().execute(() -> {
-					IPacket packet = payload.packet();
-					switch (packet) {
-						case AeroClientL2PreferencePacket pkt ->
-								INSTANCE.setClientLocalL2Preference(context.player(), pkt.isLocalL2Enabled());
-						default -> ModTemplate.LOGGER.info("Unknown client packet: {}", packet.getPacketId());
-					}
-				}));
-		ServerLifecycleEvents.SERVER_STARTED.register(INSTANCE::enableStreamingOnServerStart);
-		ServerLifecycleEvents.SERVER_STOPPED.register(INSTANCE::shutdownAll);
-		CommandRegistrationCallback.EVENT.register(AeroCommands::register);
-	}
-
 	public static void notifyBlockStateChanged(ServerLevel world, BlockPos pos, BlockState oldState, BlockState newState) {
 		INSTANCE.onBlockChanged(world, pos, oldState, newState);
 	}
@@ -461,7 +414,7 @@ public final class AeroServerRuntime {
 		return INSTANCE.publishedEntitySamples.get().get(entityId);
 	}
 
-	private void setClientLocalL2Preference(ServerPlayer player, boolean enabled) {
+	public void setClientLocalL2Preference(ServerPlayer player, boolean enabled) {
 		if (player == null) {
 			return;
 		}
@@ -475,7 +428,7 @@ public final class AeroServerRuntime {
 		}
 	}
 
-	private void onPlayerDisconnected(ServerPlayer player) {
+	public void onPlayerDisconnected(ServerPlayer player) {
 		if (player == null) {
 			return;
 		}
@@ -632,7 +585,7 @@ public final class AeroServerRuntime {
 		}
 	}
 
-	private void onChunkLoad(ServerLevel world, LevelChunk chunk) {
+	public void onChunkLoad(ServerLevel world, LevelChunk chunk) {
 		runMainThreadCallbackProfiledUnlocked(CALLBACK_PHASE_CHUNK_LOAD, () -> {
 			if (!shouldRunServerAuthoritativeL2()) {
 				return;
@@ -658,7 +611,7 @@ public final class AeroServerRuntime {
 		});
 	}
 
-	private void onChunkUnload(ServerLevel world, LevelChunk chunk) {
+	public void onChunkUnload(ServerLevel world, LevelChunk chunk) {
 		runMainThreadCallbackProfiledUnlocked(CALLBACK_PHASE_CHUNK_UNLOAD, () -> {
 			if (!shouldRunServerAuthoritativeL2()) {
 				return;
@@ -715,7 +668,7 @@ public final class AeroServerRuntime {
 		}
 	}
 
-	private void onBlockEntityLoad(BlockEntity blockEntity, ServerLevel world) {
+	public void onBlockEntityLoad(BlockEntity blockEntity, ServerLevel world) {
 		runMainThreadCallbackProfiledUnlocked(CALLBACK_PHASE_BLOCK_ENTITY_LOAD, () -> {
 			if (!shouldRunServerAuthoritativeL2()) {
 				return;
@@ -742,7 +695,7 @@ public final class AeroServerRuntime {
 		});
 	}
 
-	private void onBlockEntityUnload(BlockEntity blockEntity, ServerLevel world) {
+	public void onBlockEntityUnload(BlockEntity blockEntity, ServerLevel world) {
 		runMainThreadCallbackProfiledUnlocked(CALLBACK_PHASE_BLOCK_ENTITY_UNLOAD, () -> {
 			if (!shouldRunServerAuthoritativeL2()) {
 				return;
@@ -769,7 +722,7 @@ public final class AeroServerRuntime {
 		});
 	}
 
-	private void onWorldUnload(ServerLevel world) {
+	public void onWorldUnload(ServerLevel world) {
 		runMainThreadCallbackProfiled(CALLBACK_PHASE_WORLD_UNLOAD, () -> {
 			worldMirror.onLevelUnload(world);
 			backgroundMetGrids.remove(world.dimension());
@@ -1502,7 +1455,7 @@ public final class AeroServerRuntime {
 		builder.append('\n');
 	}
 
-	private void onServerTick(MinecraftServer server) {
+	public void onServerTick(MinecraftServer server) {
 		long tickStartNanos = System.nanoTime();
 		currentServer = server;
 		if (!streamingEnabled) {
@@ -2117,7 +2070,7 @@ public final class AeroServerRuntime {
 		}
 	}
 
-	private void enableStreamingOnServerStart(MinecraftServer server) {
+	public void enableStreamingOnServerStart(MinecraftServer server) {
 		currentServer = server;
 		streamingEnabled = true;
 		resetMainThreadProfiling();
@@ -2130,7 +2083,7 @@ public final class AeroServerRuntime {
 		lastCoordinatorNoPublishReason = "";
 	}
 
-	private void shutdownAll(MinecraftServer server) {
+	public void shutdownAll(MinecraftServer server) {
 		stopStreaming(server, true);
 		clientLocalL2Players.clear();
 		synchronized (simulationStateLock) {
@@ -6273,17 +6226,17 @@ public final class AeroServerRuntime {
 		}
 	}
 
-	private void sendStateToPlayer(ServerPlayer player, MinecraftServer server) {
+	public void sendStateToPlayer(ServerPlayer player, MinecraftServer server) {
 		ModTemplate.xplat().sendPacketToClient(new AeroRuntimeStatePacket(streamingEnabled, renderVelocityVectorsEnabled, renderStreamlinesEnabled), player);
 	}
 
-	private void broadcastState(MinecraftServer server) {
+	public void broadcastState(MinecraftServer server) {
 		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 			sendStateToPlayer(player, server);
 		}
 	}
 
-	private void sendFlowSnapshotToPlayer(ServerPlayer player, MinecraftServer server) {
+	public void sendFlowSnapshotToPlayer(ServerPlayer player, MinecraftServer server) {
 		sendCoarseWindSnapshotToPlayer(player);
 
 		if (!SERVER_L2_ATLAS_STREAMING_ENABLED) {

@@ -45,7 +45,6 @@ public class ModTemplate {
 		//com.aerodynamics4mc.net.update.ForgeCustomPayload.register();
 		//?}
 		ModBlocks.register();
-		AeroServerRuntime.init();
 	}
 
 	public static void onInitializeClient() {
