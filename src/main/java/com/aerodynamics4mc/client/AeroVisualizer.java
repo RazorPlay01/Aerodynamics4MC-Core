@@ -10,8 +10,8 @@ import com.aerodynamics4mc.network.packet.AeroFlowPacket;
 import com.aerodynamics4mc.runtime.NativeSimulationBridge;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gizmos.GizmoStyle;
@@ -25,6 +25,12 @@ import org.joml.Matrix4f;
 
 import java.util.HashMap;
 import java.util.Map;
+
+//? fabric{
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
+//?} neoforge{
+//import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+//?}
 
 public final class AeroVisualizer {
     private static final float ATLAS_VELOCITY_RANGE = 5.6f;
@@ -276,7 +282,7 @@ public final class AeroVisualizer {
         });
     }
 
-    public void renderAtlasOverlay(WorldRenderContext context) {
+    public void renderAtlasOverlay(/*? fabric{ */ WorldRenderContext /*?} neoforge{ */ /*RenderLevelStageEvent.AfterTranslucentBlocks*/ /*?} */ context) {
         if (!streamingEnabled || (remoteWindows.isEmpty() && localWindows.isEmpty())) {
             return;
         }
@@ -286,9 +292,13 @@ public final class AeroVisualizer {
         }
         Identifier dimensionId = client.level.dimension().identifier();
         Vec3 cameraPos = client.gameRenderer.getMainCamera().position();
-        VertexConsumer lineBuffer = context.consumers() == null ? null : context.consumers().getBuffer(RenderTypes.lines());
-        PoseStack matrices = context.matrices();
-        try (var ignored = client.collectPerTickGizmos()) {
+
+		MultiBufferSource.BufferSource bufferSource = client.renderBuffers().bufferSource();
+		VertexConsumer lineBuffer = bufferSource.getBuffer(RenderTypes.lines());
+
+        PoseStack matrices =  /*? fabric{ */ context.matrices(); /*?} neoforge{ */ /*context.getPoseStack();*/ /*?} */
+
+		try (var ignored = client.collectPerTickGizmos()) {
             for (RemoteFlowField field : localWindows.values()) {
                 if (!field.dimensionId().equals(dimensionId)) {
                     continue;
@@ -323,6 +333,7 @@ public final class AeroVisualizer {
                 renderAnalysisOverlay(analysisSlice);
             }
         }
+		bufferSource.endBatch(RenderTypes.lines());
     }
 
     private void renderAnalysisOverlay(AnalysisSliceView analysisSlice) {
