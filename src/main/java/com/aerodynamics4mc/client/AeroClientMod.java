@@ -9,12 +9,16 @@ import com.aerodynamics4mc.network.packet.AeroFlowAnalysisPacket;
 import com.aerodynamics4mc.network.packet.AeroFlowPacket;
 import com.aerodynamics4mc.network.packet.AeroRuntimeStatePacket;
 import lombok.Getter;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+//? fabric{
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+//?} neoforge{
+//import net.neoforged.neoforge.network.handling.IPayloadContext;
+//?}
 
 @Getter
 public final class AeroClientMod {
@@ -22,7 +26,7 @@ public final class AeroClientMod {
 	private static AeroClientMod instance = null;
 	private final AeroVisualizer visualizer = new AeroVisualizer();
 	private final IrisWindBridge irisWindBridge = new IrisWindBridge(visualizer);
-	private final ClientL2Solver clientL2Solver = new ClientL2Solver(visualizer);
+	public final ClientL2Solver clientL2Solver = new ClientL2Solver(visualizer);
 
 	private AeroClientMod() {
 		// private constructor
@@ -36,8 +40,6 @@ public final class AeroClientMod {
 	}
 
 	public void onInitializeClient() {
-		visualizer.initialize();
-		irisWindBridge.initialize();
 		clientL2Solver.initialize();
 	}
 
@@ -50,8 +52,9 @@ public final class AeroClientMod {
 
 	// ====================== Network Handlers ======================
 
-	public static void onRuntimeState(AeroRuntimeStatePacket packet, ClientPlayNetworking.Context context) {
-		context.client().execute(() -> {
+	public static void onRuntimeState(AeroRuntimeStatePacket packet, /*? fabric{ */ ClientPlayNetworking.Context /*?} neoforge{ */ /*IPayloadContext*/ /*?} */ context) {
+		context./*? fabric{ */ client().execute /*?} neoforge{ */ /*enqueueWork*/ /*?} */
+		(() -> {
 			getInstance().getVisualizer().onRuntimeState(new AeroVisualizer.AeroFlowState(
 					packet.isStreamingEnabled(),
 					packet.isRenderVelocityVectors(),
@@ -63,23 +66,26 @@ public final class AeroClientMod {
 		});
 	}
 
-	public static void onFlowField(AeroFlowPacket packet, ClientPlayNetworking.Context context) {
-		context.client().execute(() -> {
+	public static void onFlowField(AeroFlowPacket packet, /*? fabric{ */ ClientPlayNetworking.Context /*?} neoforge{ */ /*IPayloadContext*/ /*?} */ context) {
+		context./*? fabric{ */ client().execute /*?} neoforge{ */ /*enqueueWork*/ /*?} */
+		(() -> {
 			getInstance().getVisualizer().onFlowField(packet);
 			getInstance().getIrisWindBridge().markDirty();
 		});
 	}
 
-	public static void onCoarseWindField(AeroCoarseWindPacket packet, ClientPlayNetworking.Context context) {
-		context.client().execute(() -> {
+	public static void onCoarseWindField(AeroCoarseWindPacket packet, /*? fabric{ */ ClientPlayNetworking.Context /*?} neoforge{ */ /*IPayloadContext*/ /*?} */ context) {
+		context./*? fabric{ */ client().execute /*?} neoforge{ */ /*enqueueWork*/ /*?} */
+		(() -> {
 			getInstance().getVisualizer().onCoarseWindField(packet);
 			getInstance().getClientL2Solver().onCoarseWindField(packet);
 			getInstance().getIrisWindBridge().markDirty();
 		});
 	}
 
-	public static void onFlowAnalysis(AeroFlowAnalysisPacket packet, ClientPlayNetworking.Context context) {
-		context.client().execute(() -> getInstance().getVisualizer().onFlowAnalysis(packet));
+	public static void onFlowAnalysis(AeroFlowAnalysisPacket packet, /*? fabric{ */ ClientPlayNetworking.Context /*?} neoforge{ */ /*IPayloadContext*/ /*?} */ context) {
+		context./*? fabric{ */ client().execute /*?} neoforge{ */ /*enqueueWork*/ /*?} */
+		(() -> getInstance().getVisualizer().onFlowAnalysis(packet));
 	}
 
 	// ====================== Static API ======================

@@ -4,11 +4,6 @@ import com.aerodynamics4mc.ModTemplate;
 import com.aerodynamics4mc.api.SamplePolicy;
 import com.aerodynamics4mc.api.client.AeroClientWindApi;
 import com.mojang.blaze3d.platform.NativeImage;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldTerrainRenderContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
@@ -21,7 +16,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
-final class IrisWindBridge {
+public final class IrisWindBridge {
     private static final Logger LOGGER = LoggerFactory.getLogger("aerodynamics4mc/IrisWindBridge");
     static final Identifier WIND_TEXTURE_ID = Identifier.fromNamespaceAndPath(ModTemplate.MOD_ID, "dynamic/foliage_wind");
 
@@ -75,13 +70,6 @@ final class IrisWindBridge {
         this.visualizer = visualizer;
     }
 
-    void initialize() {
-        ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
-        WorldRenderEvents.START_MAIN.register(this::onRenderFrame);
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clear());
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> close());
-    }
-
     void onRuntimeState(boolean streamingEnabled) {
         this.streamingEnabled = streamingEnabled;
         this.dirty = true;
@@ -94,7 +82,7 @@ final class IrisWindBridge {
         dirty = true;
     }
 
-    private void onClientTick(Minecraft client) {
+    public void onClientTick(Minecraft client) {
         boolean irisLoaded = ModTemplate.xplat().isModLoaded("iris");
         if (!irisLoaded) {
             if (!loggedMissingIris) {
@@ -156,7 +144,7 @@ final class IrisWindBridge {
         // }
     }
 
-    private void onRenderFrame(WorldTerrainRenderContext context) {
+    public void onRenderFrame() {
         Minecraft client = Minecraft.getInstance();
         if (client == null || client.level == null || client.player == null || windTexture == null || windTexture.getPixels() == null) {
             return;
@@ -408,7 +396,7 @@ final class IrisWindBridge {
         }
     }
 
-    private void clear() {
+    public void clear() {
         dirty = true;
         streamingEnabled = false;
         lastAnchorX = Long.MIN_VALUE;
@@ -422,7 +410,7 @@ final class IrisWindBridge {
         zeroTexture();
     }
 
-    private void close() {
+    public void close() {
         clear();
         Minecraft client = Minecraft.getInstance();
         if (client != null) {

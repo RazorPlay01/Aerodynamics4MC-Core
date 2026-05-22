@@ -10,10 +10,7 @@ import com.aerodynamics4mc.network.packet.AeroFlowPacket;
 import com.aerodynamics4mc.runtime.NativeSimulationBridge;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
@@ -29,7 +26,7 @@ import org.joml.Matrix4f;
 import java.util.HashMap;
 import java.util.Map;
 
-final class AeroVisualizer {
+public final class AeroVisualizer {
     private static final float ATLAS_VELOCITY_RANGE = 5.6f;
     private static final float ATLAS_PRESSURE_RANGE = 0.03f;
     private static final int COARSE_ATMOSPHERE_CHANNELS = 10;
@@ -70,12 +67,6 @@ final class AeroVisualizer {
     private boolean renderVelocityVectors = false;
     private boolean renderStreamlines = true;
     private long clientTickCounter;
-
-    void initialize() {
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clearState());
-        ClientTickEvents.END_CLIENT_TICK.register(client -> onClientTick());
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::renderAtlasOverlay);
-    }
 
     void onRuntimeState(AeroFlowState state) {
         streamingEnabled = state.streamingEnabled();
@@ -150,7 +141,7 @@ final class AeroVisualizer {
         );
     }
 
-    void clearState() {
+    public void clearState() {
         remoteWindows.clear();
         localWindows.clear();
         coarseWindFields.clear();
@@ -263,7 +254,7 @@ final class AeroVisualizer {
         return best;
     }
 
-    private void onClientTick() {
+    public void onClientTick() {
         clientTickCounter++;
         if (!streamingEnabled) {
             return;
@@ -285,7 +276,7 @@ final class AeroVisualizer {
         });
     }
 
-    private void renderAtlasOverlay(WorldRenderContext context) {
+    public void renderAtlasOverlay(WorldRenderContext context) {
         if (!streamingEnabled || (remoteWindows.isEmpty() && localWindows.isEmpty())) {
             return;
         }
