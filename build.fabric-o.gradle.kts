@@ -40,7 +40,8 @@ platform {
 mixins {
 	common {
 		always(
-			"ServerWorldBlockStateMixin"
+			"ServerWorldBlockStateMixin",
+			"event.LevelChunkMixin"
 		)
 	}
 	client {

@@ -30,68 +30,42 @@ public class NeoforgeEntrypoint {
 
 		ModBlocks.register(modEventBus);
 
-		NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
-		NeoForge.EVENT_BUS.addListener(this::onServerTick);
-		NeoForge.EVENT_BUS.addListener(this::onChunkLoad);
-		NeoForge.EVENT_BUS.addListener(this::onChunkUnload);
-		NeoForge.EVENT_BUS.addListener(this::onWorldUnload);
-		NeoForge.EVENT_BUS.addListener(this::onPlayerLoggedIn);
-		NeoForge.EVENT_BUS.addListener(this::onPlayerLoggedOut);
-		NeoForge.EVENT_BUS.addListener(this::onServerStarted);
-		NeoForge.EVENT_BUS.addListener(this::onServerStopped);
+		NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> AeroCommands.register(event.getDispatcher()));
+		NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post event) -> runtime.onServerTick(event.getServer()));
+		NeoForge.EVENT_BUS.addListener((ChunkEvent.Load event) -> {
+			if (event.getLevel() instanceof ServerLevel serverLevel) {
+				runtime.onChunkLoad(serverLevel, event.getChunk());
+			}
+		});
+		NeoForge.EVENT_BUS.addListener((ChunkEvent.Unload event) -> {
+			if (event.getLevel() instanceof ServerLevel serverLevel) {
+				runtime.onChunkUnload(serverLevel, event.getChunk());
+			}
+		});
 
-		modEventBus.addListener(NeoforgeClientEventSubscriber::onClientSetup);
-	}
+		NeoForge.EVENT_BUS.addListener((LevelEvent.Unload event) -> {
+			if (event.getLevel() instanceof ServerLevel serverLevel) {
+				runtime.onWorldUnload(serverLevel);
+			}
+		});
 
-	private void onRegisterCommands(RegisterCommandsEvent event) {
-		AeroCommands.register(event.getDispatcher());
-	}
-
-	private void onServerTick(ServerTickEvent.Post event) {
-		runtime.onServerTick(event.getServer());
-	}
-
-	private void onChunkLoad(ChunkEvent.Load event) {
-		if (event.getLevel() instanceof ServerLevel serverLevel) {
-			runtime.onChunkLoad(serverLevel, event.getChunk());
-		}
-	}
-
-	private void onChunkUnload(ChunkEvent.Unload event) {
-		if (event.getLevel() instanceof ServerLevel serverLevel) {
-			runtime.onChunkUnload(serverLevel, event.getChunk());
-		}
-	}
-
-	private void onWorldUnload(LevelEvent.Unload event) {
-		if (event.getLevel() instanceof ServerLevel serverLevel) {
-			runtime.onWorldUnload(serverLevel);
-		}
-	}
-
-	private void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-		if (event.getEntity() instanceof ServerPlayer player) {
-			MinecraftServer server = player.server;
-			runtime.sendStateToPlayer(player, server);
-			runtime.broadcastState(server);
-			runtime.sendFlowSnapshotToPlayer(player, server);
-		}
-	}
-
-	private void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-		if (event.getEntity() instanceof ServerPlayer player) {
-			MinecraftServer server = player.server;
-			runtime.onPlayerDisconnected(player);
-			runtime.broadcastState(server);
-		}
-	}
-
-	private void onServerStarted(ServerStartedEvent event) {
-		runtime.enableStreamingOnServerStart(event.getServer());
-	}
-
-	private void onServerStopped(ServerStoppedEvent event) {
-		runtime.shutdownAll(event.getServer());
+		NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
+			if (event.getEntity() instanceof ServerPlayer player) {
+				MinecraftServer server = player.server;
+				runtime.sendStateToPlayer(player, server);
+				runtime.broadcastState(server);
+				runtime.sendFlowSnapshotToPlayer(player, server);
+			}
+		});
+		NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedOutEvent event) -> {
+			if (event.getEntity() instanceof ServerPlayer player) {
+				MinecraftServer server = player.server;
+				runtime.onPlayerDisconnected(player);
+				runtime.broadcastState(server);
+			}
+		});
+		NeoForge.EVENT_BUS.addListener((ServerStartedEvent event) -> runtime.enableStreamingOnServerStart(event.getServer()));
+		NeoForge.EVENT_BUS.addListener((ServerStoppedEvent event) -> runtime.shutdownAll(event.getServer()));
 	}
 }
 //?}

@@ -34,8 +34,6 @@ public class FabricEntrypoint implements ModInitializer {
 		ServerTickEvents.END_SERVER_TICK.register(runtime::onServerTick);
 		ServerChunkEvents.CHUNK_LOAD.register(runtime::onChunkLoad);
 		ServerChunkEvents.CHUNK_UNLOAD.register(runtime::onChunkUnload);
-		ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register(runtime::onBlockEntityLoad);
-		ServerBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register(runtime::onBlockEntityUnload);
 		ServerWorldEvents.UNLOAD.register((server, world) -> runtime.onWorldUnload(world));
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			runtime.sendStateToPlayer(handler.player, server);
